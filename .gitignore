@@ -1,0 +1,7 @@
+.vscode/
+build/
+.cache/
+logs/
+.vs/
+out/
+CMakeLists.txt.user

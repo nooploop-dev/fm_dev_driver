@@ -1,0 +1,9 @@
+<launch>
+    <arg name="port" default="/dev/ttyUSB0" />
+    <arg name="baudrate" default="921600" />
+
+    <node pkg="fm_dev_driver" type="ros_converter" name="ros_converter" output="screen">
+        <param name="port" value="$(arg port)" />
+        <param name="baudrate" value="$(arg baudrate)" />
+    </node>
+</launch>

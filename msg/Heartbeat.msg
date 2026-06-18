@@ -1,0 +1,11 @@
+string hardware_name
+uint8[2] hardware_version
+uint8 hardware_batch
+uint8 hardware_year
+uint8 hardware_month
+uint8 hardware_day
+uint8 firmware_series
+uint8[4] firmware_version
+bool need_restart
+bool restart_info_dirty
+uint32 uptime
