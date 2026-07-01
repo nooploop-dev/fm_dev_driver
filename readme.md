@@ -1,6 +1,6 @@
 # AOA DEVICE DRIVER
 
-简体中文 | [English](./README.en.md)
+简体中文 | [English](./readme.en.md)
 
 本仓库为 Nooploop [AOA Follow Me](https://www.nooploop.com/cn/follow-me/) 产品的驱动代码。它提供：
 

@@ -1,6 +1,6 @@
 # AOA DEVICE DRIVER
 
-[简体中文](./README.md)  | English
+[简体中文](./readme.md)  | English
 
 This repository contains the driver code for the Nooploop [AOA Follow Me](https://www.nooploop.com/en/follow-me/) product. It provides:
 
