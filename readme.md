@@ -239,7 +239,8 @@ groups | grep dialout
 | `~/spherical_result` | `SphericalResult` | 球坐标定位结果（距离/方位角/俯仰角） |
 | `~/prev_spherical_result` | `PrevSphericalResult` | 上一次球坐标结果（TAG） |
 | `~/dis` | `Dis` | 测距结果 |
-| `~/heartbeat` | `Heartbeat` | 设备心跳/状态信息 |
+| ~/heartbeat | Heartbeat | 设备心跳/状态信息 |
+| `~/param` | `Param` | 参数读取响应/当前参数 |
 | `~/echo_from_device` | `Echo` | 设备回显 |
 | `~/user_data_from_device` | `DataUserToUser` | 设备转发的用户自定义数据 |
 
@@ -248,7 +249,9 @@ groups | grep dialout
 | 话题 | 消息类型 | 说明 |
 | --- | --- | --- |
 | `~/find` | `Find` | 让设备震动/闪灯以便寻找 |
-| `~/restart` | `Restart` | 重启设备 |
+| ~/restart | Restart | 重启设备 |
+| `~/param_read` | `std_msgs/Empty` | 读取设备参数 |
+| `~/param_write` | `Param` | 写入设备参数 |
 | `~/begin_pair` | `BeginPair` | 进入配对模式 |
 | `~/cancel_pair` | `CancelPair` | 取消配对 |
 | `~/echo_to_device` | `Echo` | 回显测试 |

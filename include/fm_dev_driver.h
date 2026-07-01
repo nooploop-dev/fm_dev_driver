@@ -36,41 +36,25 @@ typedef enum {
 // 单个方向上，每个消息ID都是唯一的
 enum {
   FM_MSG_INVALID,
+  FM_MSG_ECHO = 3, // v^
 
-  FM_MSG_DEBUG_READ,                 // v
-  FM_MSG_DEBUG_WRITE,                // v
-  FM_MSG_DEBUG = FM_MSG_DEBUG_WRITE, // ^
-
-  FM_MSG_ECHO, // v^
-
-  FM_MSG_FIND, // v^
+  FM_MSG_FIND = 4, // v^
 
   FM_MSG_RESTART, // v^
-
-  FM_MSG_RESTART_INFO_READ = 13,                   // v
-  FM_MSG_RESTART_INFO_CLEAR,                       // v 空消息
-  FM_MSG_RESTART_INFO = FM_MSG_RESTART_INFO_CLEAR, // ^
-
-  FM_MSG_ASSERT_INFO_READ,                       // v
-  FM_MSG_ASSERT_INFO_CLEAR,                      // v 空消息
-  FM_MSG_ASSERT_INFO = FM_MSG_ASSERT_INFO_CLEAR, // ^
 
   FM_MSG_PARAM_READ = 25,            // v
   FM_MSG_PARAM_WRITE,                // v
   FM_MSG_PARAM = FM_MSG_PARAM_WRITE, // ^
 
-  FM_MSG_HEARTBEAT,         // ^
-  FM_MSG_OUTSIDE_HEARTBEAT, // v
+  FM_MSG_HEARTBEAT, // ^
 
-  FM_MSG_RESULT,      // ^
+  FM_MSG_RESULT = 29, // ^
   FM_MSG_PREV_RESULT, // ^
 
   FM_MSG_BEGIN_PAIR = 32, // v^
   FM_MSG_CANCEL_PAIR,     // v^
 
-  FM_MSG_DATA_USER_TO_DEV,  // v 用户不需要直接使用，内部接口会封装
-  FM_MSG_DATA_DEV_TO_USER,  // ^ 用户不需要直接使用，内部接口会解析
-  FM_MSG_DATA_USER_TO_USER, // v^
+  FM_MSG_DATA_USER_TO_USER = 36, // v^
 
   FM_MSG_SPHERICAL_RESULT = 42, // ^
   FM_MSG_PREV_SPHERICAL_RESULT, // ^
@@ -81,13 +65,6 @@ enum {
 };
 
 typedef int64_t fm_local_time_t;
-
-// 开发调试用，测试信息读写，复位后丢失
-#define FM_DATA_DEBUG_PAYLOAD_SIZE 64
-typedef struct {
-  uint8_t payload_size;
-  uint8_t payload[FM_DATA_DEBUG_PAYLOAD_SIZE];
-} FMDataDebug;
 
 // 测试双向通信，发送后原样返回
 #define FM_DATA_ECHO_PAYLOAD_SIZE 64
@@ -108,31 +85,6 @@ typedef struct {
   // 是否仅需要时重启
   bool only_when_need;
 } FMDataRestart;
-
-// 记录复位信息
-#define FM_DATA_RESTART_INFO_INFO_SIZE 17
-typedef struct {
-  uint8_t undefined;
-  uint8_t power_on;
-  uint8_t pin;
-  uint8_t watchdog;
-  uint8_t software;
-  uint8_t cpu_lockup;
-  uint8_t wakeup;
-  uint8_t reserved;
-  fm_local_time_t local_time;                // 上次触发复位时的本地时间
-  char info[FM_DATA_RESTART_INFO_INFO_SIZE]; // 复位信息
-} FMDataRestartInfo;
-
-// 记录上次断言信息
-#define FM_DATA_ASSERT_INFO_INFO_SIZE 65
-typedef struct {
-  uint8_t assert_count;
-  // 复位后短时间内就重启，连续触发一定次数将重置参数
-  uint8_t assert_count_within_short_time;
-  fm_local_time_t local_time;               // 上次触发断言时的本地时间
-  char info[FM_DATA_ASSERT_INFO_INFO_SIZE]; // 断言信息
-} FMDataAssertInfo;
 
 typedef struct {
   float z_expect;
@@ -170,11 +122,6 @@ typedef struct {
   uint32_t uptime;
 } FMDataHeartbeat;
 
-typedef struct {
-  bool is_backend;
-  uint8_t timeout;
-} FMDataOutsideHeartbeat;
-
 // 定位结果，vel单位cm/s，noise单位cm
 typedef struct {
   fm_local_time_t local_time; // us
@@ -208,8 +155,6 @@ typedef struct {
   uint8_t payload[FM_USER_DATA_PAYLOAD_SIZE];
 } FMDataUserData;
 
-typedef FMDataUserData FMDataDataUserToDev;
-typedef FMDataUserData FMDataDataDevToUser;
 typedef FMDataUserData FMDataDataUserToUser;
 
 // 球坐标系结果，由Result转换而来

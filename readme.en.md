@@ -247,7 +247,8 @@ The node name is `ros_converter`, and all topics are namespaced under the node n
 | `~/spherical_result` | `SphericalResult` | Spherical positioning result (distance/azimuth/elevation) |
 | `~/prev_spherical_result` | `PrevSphericalResult` | Previous spherical result (TAG) |
 | `~/dis` | `Dis` | Ranging result |
-| `~/heartbeat` | `Heartbeat` | Device heartbeat/status info |
+| ~/heartbeat | Heartbeat | Device heartbeat/status info |
+| `~/param` | `Param` | Parameter read response/current parameters |
 | `~/echo_from_device` | `Echo` | Device echo |
 | `~/user_data_from_device` | `DataUserToUser` | User-defined data forwarded by the device |
 
@@ -256,7 +257,9 @@ The node name is `ros_converter`, and all topics are namespaced under the node n
 | Topic | Message Type | Description |
 | --- | --- | --- |
 | `~/find` | `Find` | Make the device vibrate/blink to locate it |
-| `~/restart` | `Restart` | Restart the device |
+| ~/restart | Restart | Restart the device |
+| `~/param_read` | `std_msgs/Empty` | Read device parameters |
+| `~/param_write` | `Param` | Write device parameters |
 | `~/begin_pair` | `BeginPair` | Enter pairing mode |
 | `~/cancel_pair` | `CancelPair` | Cancel pairing |
 | `~/echo_to_device` | `Echo` | Echo test |

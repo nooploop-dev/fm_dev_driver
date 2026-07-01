@@ -88,6 +88,7 @@ if(FM_BUILD_ROS1)
     Echo.msg
     Find.msg
     Restart.msg
+    Param.msg
     Heartbeat.msg
     PrevResult.msg
     BeginPair.msg
@@ -111,6 +112,7 @@ if(FM_BUILD_ROS2)
     "msg/Echo.msg"
     "msg/Find.msg"
     "msg/Restart.msg"
+    "msg/Param.msg"
     "msg/Heartbeat.msg"
     "msg/PrevResult.msg"
     "msg/BeginPair.msg"

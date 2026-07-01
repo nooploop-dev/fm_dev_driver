@@ -207,7 +207,7 @@ TEST_CASE("user->dev round trip") {
     FMDataFind f{};
     f.duration = 42;
 
-    // wired=false 时 msg 被包进 user_data(FM_MSG_DATA_USER_TO_DEV)，
+    // wired=false 时 msg 被包进内部无线 user_data，
     // 解析端自动拆包后回调内层 msg，结果与有线一致
     p.feed(build_to_dev(FM_WIRELESS, cnt, FM_MSG_FIND, &f));
 
@@ -409,22 +409,18 @@ TEST_CASE("from_dev frame parsing") {
 
 // =============================================================================
 // 全消息单条组包/解析往返测试
-// (排除 FM_MSG_DATA_USER_TO_DEV / FM_MSG_DATA_DEV_TO_USER: 它们是无线封装层，
-//  无独立对外组包接口)
+// 内部无线封装消息不暴露为公共 FM_MSG_*，无独立对外组包接口。
 //
 // 按消息方向选用对应接口:
 //   user->dev(方向含 v): fm_prepare_msg_to_dev 组包 + fm_parser_from_user 解析,
 //                        WIRED / WIRELESS 两种连接类型都覆盖。
 //   dev->user(方向含 ^): fm_prepare_msg_to_user 组包 + fm_parser_from_dev
-//   解析。
-//                        (无线 dev->user 需经已排除的 FM_MSG_DATA_DEV_TO_USER
-//                         封装，无独立组包接口，故此方向仅有线)
+//                        解析。
 //
 // 校验: 组包->解析后, 用解析回调得到的 payload 再次组包, 应得到与原始帧逐字节
 // 一致的结果(往返保真); 同时校验 id / cnt / 连接类型 / 角色 / payload 长度。
 // 空消息(无对应结构体)用 NULL 组包, 解析回调 payload 应为空。
 // =============================================================================
-
 namespace {
 
 template <typename T> Bytes payload_of(const T &v) {
@@ -442,28 +438,8 @@ struct MsgCase {
 std::vector<MsgCase> user_to_dev_cases() {
   std::vector<MsgCase> cases;
 
-  // 无负载的读取/清除类命令(payload为空, 用NULL组包)
-  const struct {
-    const char *name;
-    fm_msg_id_t id;
-  } empties[] = {
-      {"DEBUG_READ", FM_MSG_DEBUG_READ},
-      {"RESTART_INFO_READ", FM_MSG_RESTART_INFO_READ},
-      {"RESTART_INFO_CLEAR", FM_MSG_RESTART_INFO_CLEAR},
-      {"ASSERT_INFO_READ", FM_MSG_ASSERT_INFO_READ},
-      {"ASSERT_INFO_CLEAR", FM_MSG_ASSERT_INFO_CLEAR},
-      {"PARAM_READ", FM_MSG_PARAM_READ},
-  };
-  for (const auto &e : empties) {
-    cases.push_back({e.name, e.id, {}});
-  }
-
-  FMDataDebug debug{};
-  debug.payload_size = 3;
-  debug.payload[0] = 0xA1;
-  debug.payload[1] = 0xB2;
-  debug.payload[2] = 0xC3;
-  cases.push_back({"DEBUG", FM_MSG_DEBUG, payload_of(debug)});
+  // 无负载的读取命令(payload为空, 用NULL组包)
+  cases.push_back({"PARAM_READ", FM_MSG_PARAM_READ, {}});
 
   FMDataEcho echo{};
   echo.payload_size = 2;
@@ -485,13 +461,7 @@ std::vector<MsgCase> user_to_dev_cases() {
   param.min_dis = 0.3f;
   param.min_freq_count = 3;
   param.max_delta_rssi = 10;
-  cases.push_back({"PARAM", FM_MSG_PARAM, payload_of(param)});
-
-  FMDataOutsideHeartbeat ohb{};
-  ohb.is_backend = true;
-  ohb.timeout = 30;
-  cases.push_back(
-      {"OUTSIDE_HEARTBEAT", FM_MSG_OUTSIDE_HEARTBEAT, payload_of(ohb)});
+  cases.push_back({"PARAM_WRITE", FM_MSG_PARAM_WRITE, payload_of(param)});
 
   FMDataBeginPair begin{};
   begin.timeout = 15;
@@ -514,12 +484,6 @@ std::vector<MsgCase> user_to_dev_cases() {
 
 std::vector<MsgCase> dev_to_user_cases() {
   std::vector<MsgCase> cases;
-
-  FMDataDebug debug{};
-  debug.payload_size = 2;
-  debug.payload[0] = 0x55;
-  debug.payload[1] = 0xAA;
-  cases.push_back({"DEBUG", FM_MSG_DEBUG, payload_of(debug)});
 
   FMDataEcho echo{};
   echo.payload_size = 1;
@@ -606,22 +570,6 @@ std::vector<MsgCase> dev_to_user_cases() {
   dis.dis = 3.5f;
   dis.rx_rate = 42;
   cases.push_back({"DIS", FM_MSG_DIS, payload_of(dis)});
-
-  // 以下消息与 user->dev 的 *_CLEAR 空命令 / *_WRITE 共用ID, 但 dev->user 方向
-  // 是带负载的响应(*_INFO / 参数响应), 由按方向拆分的组包/解析接口唯一映射。
-  FMDataRestartInfo rinfo{};
-  rinfo.power_on = 1;
-  rinfo.watchdog = 2;
-  rinfo.local_time = 4444;
-  std::memcpy(rinfo.info, "boot", 4);
-  cases.push_back({"RESTART_INFO", FM_MSG_RESTART_INFO, payload_of(rinfo)});
-
-  FMDataAssertInfo ainfo{};
-  ainfo.assert_count = 3;
-  ainfo.assert_count_within_short_time = 1;
-  ainfo.local_time = 5555;
-  std::memcpy(ainfo.info, "assert@line", 11);
-  cases.push_back({"ASSERT_INFO", FM_MSG_ASSERT_INFO, payload_of(ainfo)});
 
   return cases;
 }

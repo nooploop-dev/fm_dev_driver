@@ -18,6 +18,8 @@ Ros2DataHandle::Ros2DataHandle(const rclcpp::Node::SharedPtr &node)
       node_->create_publisher<fm_dev_driver::msg::Echo>("~/echo_from_device", 50);
   heartbeat_pub_ =
       node_->create_publisher<fm_dev_driver::msg::Heartbeat>("~/heartbeat", 50);
+  param_pub_ =
+      node_->create_publisher<fm_dev_driver::msg::Param>("~/param", 50);
   result_pub_ =
       node_->create_publisher<fm_dev_driver::msg::Result>("~/result", 50);
   prev_result_pub_ = node_->create_publisher<fm_dev_driver::msg::PrevResult>(
@@ -47,6 +49,16 @@ Ros2DataHandle::Ros2DataHandle(const rclcpp::Node::SharedPtr &node)
       "~/restart", 50,
       [this](const fm_dev_driver::msg::Restart::SharedPtr msg) {
         on_restart(msg);
+      });
+  param_read_sub_ = node_->create_subscription<std_msgs::msg::Empty>(
+      "~/param_read", 50,
+      [this](const std_msgs::msg::Empty::SharedPtr msg) {
+        on_param_read(msg);
+      });
+  param_write_sub_ = node_->create_subscription<fm_dev_driver::msg::Param>(
+      "~/param_write", 50,
+      [this](const fm_dev_driver::msg::Param::SharedPtr msg) {
+        on_param_write(msg);
       });
   begin_pair_sub_ = node_->create_subscription<fm_dev_driver::msg::BeginPair>(
       "~/begin_pair", 50,
@@ -95,6 +107,21 @@ void Ros2DataHandle::dispatch(const FMDataHeartbeat &data) {
   msg.restart_info_dirty = data.restart_info_dirty;
   msg.uptime = data.uptime;
   heartbeat_pub_->publish(msg);
+}
+
+void Ros2DataHandle::dispatch(const FMDataParam &data) {
+  fm_dev_driver::msg::Param msg;
+  msg.z_expect = data.z_expect;
+  msg.z_expect_noise = data.z_expect_noise;
+  for (size_t i = 0; i < 3; i++) {
+    msg.max_acceleration[i] = data.max_acceleration[i];
+  }
+  msg.reserved = data.reserved;
+  msg.min_dis = data.min_dis;
+  msg.min_freq_duration = data.min_freq_duration;
+  msg.min_freq_count = data.min_freq_count;
+  msg.max_delta_rssi = data.max_delta_rssi;
+  param_pub_->publish(msg);
 }
 
 void Ros2DataHandle::dispatch(const FMDataResult &data) {
@@ -176,6 +203,28 @@ void Ros2DataHandle::on_restart(
   main_common_send_msg(FM_WIRED, FM_MSG_RESTART, &data, sizeof(data));
 }
 
+void Ros2DataHandle::on_param_read(
+    const std_msgs::msg::Empty::SharedPtr msg) {
+  (void)msg;
+  main_common_send_msg(FM_WIRED, FM_MSG_PARAM_READ, nullptr, 0);
+}
+
+void Ros2DataHandle::on_param_write(
+    const fm_dev_driver::msg::Param::SharedPtr msg) {
+  FMDataParam data{};
+  data.z_expect = msg->z_expect;
+  data.z_expect_noise = msg->z_expect_noise;
+  for (size_t i = 0; i < 3; i++) {
+    data.max_acceleration[i] = msg->max_acceleration[i];
+  }
+  data.reserved = msg->reserved;
+  data.min_dis = msg->min_dis;
+  data.min_freq_duration = msg->min_freq_duration;
+  data.min_freq_count = msg->min_freq_count;
+  data.max_delta_rssi = msg->max_delta_rssi;
+  main_common_send_msg(FM_WIRED, FM_MSG_PARAM_WRITE, &data, sizeof(data));
+}
+
 void Ros2DataHandle::on_begin_pair(
     const fm_dev_driver::msg::BeginPair::SharedPtr msg) {
   FMDataBeginPair data{};
@@ -217,6 +266,9 @@ void Ros2DataHandle::on_msg(fm_connect_type_e connect_type, fm_role_e role,
     break;
   case FM_MSG_HEARTBEAT:
     s_self->dispatch(*static_cast<const FMDataHeartbeat *>(msg_payload));
+    break;
+  case FM_MSG_PARAM:
+    s_self->dispatch(*static_cast<const FMDataParam *>(msg_payload));
     break;
   case FM_MSG_RESULT:
     s_self->dispatch(*static_cast<const FMDataResult *>(msg_payload));

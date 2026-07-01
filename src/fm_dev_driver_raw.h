@@ -29,24 +29,6 @@ static inline uint16_t fm_clamp_cast_u16(float v) {
 
 typedef struct {
   uint8_t payload_size;
-  uint8_t payload[FM_DATA_DEBUG_PAYLOAD_SIZE];
-} FMRawDataDebug;
-static inline void fm_data_debug_from_raw(const FMRawDataDebug *raw_data,
-                                          FMDataDebug *data) {
-  data->payload_size = raw_data->payload_size;
-  memcpy(data->payload, raw_data->payload, raw_data->payload_size);
-}
-static inline void fm_data_debug_to_raw(const FMDataDebug *data, void *raw_data,
-                                        int *raw_data_size) {
-  FMRawDataDebug *raw = (FMRawDataDebug *)raw_data;
-  memset(raw, 0, sizeof(*raw));
-  raw->payload_size = data->payload_size;
-  memcpy(raw->payload, data->payload, data->payload_size);
-  *raw_data_size = offsetof(FMRawDataDebug, payload) + raw->payload_size;
-}
-
-typedef struct {
-  uint8_t payload_size;
   uint8_t payload[FM_DATA_ECHO_PAYLOAD_SIZE];
 } FMRawDataEcho;
 static inline void fm_data_echo_from_raw(const FMRawDataEcho *raw_data,
@@ -93,83 +75,6 @@ static inline void fm_data_restart_to_raw(const FMDataRestart *data,
   memset(raw, 0, sizeof(*raw));
   raw->delay = data->delay;
   raw->only_when_need = data->only_when_need;
-  *raw_data_size = sizeof(*raw);
-}
-
-typedef struct {
-  uint8_t undefined;
-  uint8_t power_on;
-  uint8_t pin;
-  uint8_t watchdog;
-  uint8_t software;
-  uint8_t cpu_lockup;
-  uint8_t wakeup;
-  uint8_t reserved;
-  int64_t local_time;
-  char info[FM_DATA_RESTART_INFO_INFO_SIZE];
-} FMRawDataRestartInfo;
-static inline void
-fm_data_restart_info_from_raw(const FMRawDataRestartInfo *raw_data,
-                              FMDataRestartInfo *data) {
-  data->undefined = raw_data->undefined;
-  data->power_on = raw_data->power_on;
-  data->pin = raw_data->pin;
-  data->watchdog = raw_data->watchdog;
-  data->software = raw_data->software;
-  data->cpu_lockup = raw_data->cpu_lockup;
-  data->wakeup = raw_data->wakeup;
-  data->reserved = raw_data->reserved;
-  data->local_time = raw_data->local_time;
-  size_t len = strnlen(raw_data->info, sizeof(raw_data->info));
-  memcpy(data->info, raw_data->info, len);
-  data->info[len] = '\0';
-}
-static inline void fm_data_restart_info_to_raw(const FMDataRestartInfo *data,
-                                               void *raw_data,
-                                               int *raw_data_size) {
-  FMRawDataRestartInfo *raw = (FMRawDataRestartInfo *)raw_data;
-  memset(raw, 0, sizeof(*raw));
-  raw->undefined = data->undefined;
-  raw->power_on = data->power_on;
-  raw->pin = data->pin;
-  raw->watchdog = data->watchdog;
-  raw->software = data->software;
-  raw->cpu_lockup = data->cpu_lockup;
-  raw->wakeup = data->wakeup;
-  raw->reserved = data->reserved;
-  raw->local_time = data->local_time;
-  size_t len = strnlen(data->info, sizeof(raw->info));
-  memcpy(raw->info, data->info, len);
-  *raw_data_size = sizeof(*raw);
-}
-
-typedef struct {
-  uint8_t assert_count;
-  uint8_t assert_count_within_short_time;
-  int64_t local_time;
-  char info[FM_DATA_ASSERT_INFO_INFO_SIZE];
-} FMRawDataAssertInfo;
-static inline void
-fm_data_assert_info_from_raw(const FMRawDataAssertInfo *raw_data,
-                             FMDataAssertInfo *data) {
-  data->assert_count = raw_data->assert_count;
-  data->assert_count_within_short_time =
-      raw_data->assert_count_within_short_time;
-  data->local_time = raw_data->local_time;
-  size_t len = strnlen(raw_data->info, sizeof(raw_data->info));
-  memcpy(data->info, raw_data->info, len);
-  data->info[len] = '\0';
-}
-static inline void fm_data_assert_info_to_raw(const FMDataAssertInfo *data,
-                                              void *raw_data,
-                                              int *raw_data_size) {
-  FMRawDataAssertInfo *raw = (FMRawDataAssertInfo *)raw_data;
-  memset(raw, 0, sizeof(*raw));
-  raw->assert_count = data->assert_count;
-  raw->assert_count_within_short_time = data->assert_count_within_short_time;
-  raw->local_time = data->local_time;
-  size_t len = strnlen(data->info, sizeof(raw->info));
-  memcpy(raw->info, data->info, len);
   *raw_data_size = sizeof(*raw);
 }
 
@@ -275,26 +180,6 @@ static inline void fm_data_heartbeat_to_raw(const FMDataHeartbeat *data,
   raw->need_restart = data->need_restart;
   raw->restart_info_dirty = data->restart_info_dirty;
   raw->uptime = data->uptime;
-  *raw_data_size = sizeof(*raw);
-}
-
-typedef struct {
-  uint8_t is_backend : 1;
-  uint8_t timeout : 7;
-} FMRawDataOutsideHeartbeat;
-static inline void
-fm_data_outside_heartbeat_from_raw(const FMRawDataOutsideHeartbeat *raw_data,
-                                   FMDataOutsideHeartbeat *data) {
-  data->is_backend = raw_data->is_backend;
-  data->timeout = raw_data->timeout;
-}
-static inline void
-fm_data_outside_heartbeat_to_raw(const FMDataOutsideHeartbeat *data,
-                                 void *raw_data, int *raw_data_size) {
-  FMRawDataOutsideHeartbeat *raw = (FMRawDataOutsideHeartbeat *)raw_data;
-  memset(raw, 0, sizeof(*raw));
-  raw->is_backend = data->is_backend;
-  raw->timeout = data->timeout;
   *raw_data_size = sizeof(*raw);
 }
 

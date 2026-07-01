@@ -6,6 +6,12 @@
 #include <assert.h>
 #include <string.h>
 
+// 无线封装消息不对外暴露，但协议层仍使用固定 ID。
+enum {
+  FM_MSG_INTERNAL_DATA_USER_TO_DEV = 34,
+  FM_MSG_INTERNAL_DATA_DEV_TO_USER = 35,
+};
+
 // encode: 表示将消息结构体从app层(FMData*)转换为协议层(FMRawData*)
 // decode: 表示将消息结构体从协议层(FMRawData*)转换为app层(FMData*)
 
@@ -13,11 +19,6 @@ static int fm_user_to_dev_encode(fm_msg_id_t msg_id, const void *app,
                                  uint8_t *out) {
   int size = 0;
   switch (msg_id) {
-  case FM_MSG_DEBUG_READ:
-    break;
-  case FM_MSG_DEBUG_WRITE:
-    fm_data_debug_to_raw(app, out, &size);
-    break;
   case FM_MSG_ECHO:
     fm_data_echo_to_raw(app, out, &size);
     break;
@@ -27,21 +28,10 @@ static int fm_user_to_dev_encode(fm_msg_id_t msg_id, const void *app,
   case FM_MSG_RESTART:
     fm_data_restart_to_raw(app, out, &size);
     break;
-  case FM_MSG_RESTART_INFO_READ:
-    break;
-  case FM_MSG_RESTART_INFO_CLEAR:
-    break;
-  case FM_MSG_ASSERT_INFO_READ:
-    break;
-  case FM_MSG_ASSERT_INFO_CLEAR:
-    break;
   case FM_MSG_PARAM_READ:
     break;
   case FM_MSG_PARAM_WRITE:
     fm_data_param_to_raw(app, out, &size);
-    break;
-  case FM_MSG_OUTSIDE_HEARTBEAT:
-    fm_data_outside_heartbeat_to_raw(app, out, &size);
     break;
   case FM_MSG_BEGIN_PAIR:
     fm_data_begin_pair_to_raw(app, out, &size);
@@ -64,9 +54,6 @@ static int fm_dev_to_user_encode(fm_msg_id_t msg_id, const void *app,
                                  uint8_t *out) {
   int size = 0;
   switch (msg_id) {
-  case FM_MSG_DEBUG: // 响应
-    fm_data_debug_to_raw(app, out, &size);
-    break;
   case FM_MSG_ECHO:
     fm_data_echo_to_raw(app, out, &size);
     break;
@@ -75,12 +62,6 @@ static int fm_dev_to_user_encode(fm_msg_id_t msg_id, const void *app,
     break;
   case FM_MSG_RESTART:
     fm_data_restart_to_raw(app, out, &size);
-    break;
-  case FM_MSG_RESTART_INFO: // == FM_MSG_RESTART_INFO_CLEAR
-    fm_data_restart_info_to_raw(app, out, &size);
-    break;
-  case FM_MSG_ASSERT_INFO: // == FM_MSG_ASSERT_INFO_CLEAR
-    fm_data_assert_info_to_raw(app, out, &size);
     break;
   case FM_MSG_PARAM: // 响应
     fm_data_param_to_raw(app, out, &size);
@@ -163,10 +144,6 @@ static void fm_parser_from_dev_user_to_user(FMParserFromDev *parser,
 static void fm_dev_to_user_decode(void *arg, const FMData *msg) {
   FMParserFromDev *parser = (FMParserFromDev *)arg;
   switch (msg->id) {
-  case FM_MSG_DEBUG:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataDebug, fm_data_debug_from_raw,
-                            FMDataDebug);
-    break;
   case FM_MSG_ECHO:
     FM_DEV_TO_USER_DISPATCH(FMRawDataEcho, fm_data_echo_from_raw, FMDataEcho);
     break;
@@ -176,14 +153,6 @@ static void fm_dev_to_user_decode(void *arg, const FMData *msg) {
   case FM_MSG_RESTART:
     FM_DEV_TO_USER_DISPATCH(FMRawDataRestart, fm_data_restart_from_raw,
                             FMDataRestart);
-    break;
-  case FM_MSG_RESTART_INFO:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataRestartInfo, fm_data_restart_info_from_raw,
-                            FMDataRestartInfo);
-    break;
-  case FM_MSG_ASSERT_INFO:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataAssertInfo, fm_data_assert_info_from_raw,
-                            FMDataAssertInfo);
     break;
   case FM_MSG_HEARTBEAT:
     FM_DEV_TO_USER_DISPATCH(FMRawDataHeartbeat, fm_data_heartbeat_from_raw,
@@ -222,7 +191,7 @@ static void fm_dev_to_user_decode(void *arg, const FMData *msg) {
     FM_DEV_TO_USER_DISPATCH(FMRawDataParam, fm_data_param_from_raw,
                             FMDataParam);
     break;
-  case FM_MSG_DATA_DEV_TO_USER:
+  case FM_MSG_INTERNAL_DATA_DEV_TO_USER:
     fm_parser_from_dev_dev_to_user(parser, msg);
     break;
   case FM_MSG_DATA_USER_TO_USER:
@@ -270,20 +239,11 @@ static void fm_parser_from_user_user_to_user(FMParserFromUser *parser,
 static void fm_user_to_dev_decode(void *arg, const FMData *msg) {
   FMParserFromUser *parser = (FMParserFromUser *)arg;
   switch (msg->id) {
-  // 无负载的读取/清除类命令
-  case FM_MSG_DEBUG_READ:
-  case FM_MSG_RESTART_INFO_READ:
-  case FM_MSG_RESTART_INFO_CLEAR:
-  case FM_MSG_ASSERT_INFO_READ:
-  case FM_MSG_ASSERT_INFO_CLEAR:
+  // 无负载的读取命令
   case FM_MSG_PARAM_READ:
     if (parser->on_msg) {
       parser->on_msg(parser->frame_cnt, msg->id, NULL, 0);
     }
-    break;
-  case FM_MSG_DEBUG:
-    FM_USER_TO_DEV_DISPATCH(FMRawDataDebug, fm_data_debug_from_raw,
-                            FMDataDebug);
     break;
   case FM_MSG_ECHO:
     FM_USER_TO_DEV_DISPATCH(FMRawDataEcho, fm_data_echo_from_raw, FMDataEcho);
@@ -294,11 +254,6 @@ static void fm_user_to_dev_decode(void *arg, const FMData *msg) {
   case FM_MSG_RESTART:
     FM_USER_TO_DEV_DISPATCH(FMRawDataRestart, fm_data_restart_from_raw,
                             FMDataRestart);
-    break;
-  case FM_MSG_OUTSIDE_HEARTBEAT:
-    FM_USER_TO_DEV_DISPATCH(FMRawDataOutsideHeartbeat,
-                            fm_data_outside_heartbeat_from_raw,
-                            FMDataOutsideHeartbeat);
     break;
   case FM_MSG_BEGIN_PAIR:
     FM_USER_TO_DEV_DISPATCH(FMRawDataBeginPair, fm_data_begin_pair_from_raw,
@@ -312,7 +267,7 @@ static void fm_user_to_dev_decode(void *arg, const FMData *msg) {
     FM_USER_TO_DEV_DISPATCH(FMRawDataParam, fm_data_param_from_raw,
                             FMDataParam);
     break;
-  case FM_MSG_DATA_USER_TO_DEV:
+  case FM_MSG_INTERNAL_DATA_USER_TO_DEV:
     fm_parser_from_user_user_to_dev(parser, msg);
     break;
   case FM_MSG_DATA_USER_TO_USER:
@@ -335,7 +290,7 @@ static int fm_build_msg_to_dev(fm_connect_type_e connect_type,
   FMRawDataDataUserToDev ud;
   ud.payload_size =
       (uint8_t)fm_msg_write(ud.payload, msg_id, proto, proto_size);
-  return fm_msg_write(out, FM_MSG_DATA_USER_TO_DEV, &ud,
+  return fm_msg_write(out, FM_MSG_INTERNAL_DATA_USER_TO_DEV, &ud,
                       fm_msg_user_data_bytes(&ud));
 }
 

@@ -8,12 +8,14 @@
 #include <fm_dev_driver/Echo.h>
 #include <fm_dev_driver/Find.h>
 #include <fm_dev_driver/Heartbeat.h>
+#include <fm_dev_driver/Param.h>
 #include <fm_dev_driver/PrevResult.h>
 #include <fm_dev_driver/PrevSphericalResult.h>
 #include <fm_dev_driver/Restart.h>
 #include <fm_dev_driver/Result.h>
 #include <fm_dev_driver/SphericalResult.h>
 #include <ros/ros.h>
+#include <std_msgs/Empty.h>
 
 class Ros1DataHandle {
 public:
@@ -30,6 +32,7 @@ private:
   // 设备 -> 用户(^)，解析后发布到话题
   void dispatch(const FMDataEcho &data);
   void dispatch(const FMDataHeartbeat &data);
+  void dispatch(const FMDataParam &data);
   void dispatch(const FMDataResult &data);
   void dispatch(const FMDataPrevResult &data);
   void dispatch(const FMDataDataUserToUser &data);
@@ -41,6 +44,8 @@ private:
   void on_echo_to_device(const fm_dev_driver::Echo::ConstPtr &msg);
   void on_find(const fm_dev_driver::Find::ConstPtr &msg);
   void on_restart(const fm_dev_driver::Restart::ConstPtr &msg);
+  void on_param_read(const std_msgs::Empty::ConstPtr &msg);
+  void on_param_write(const fm_dev_driver::Param::ConstPtr &msg);
   void on_begin_pair(const fm_dev_driver::BeginPair::ConstPtr &msg);
   void on_cancel_pair(const fm_dev_driver::CancelPair::ConstPtr &msg);
   void
@@ -51,6 +56,7 @@ private:
 
   ros::Publisher echo_from_device_pub_;
   ros::Publisher heartbeat_pub_;
+  ros::Publisher param_pub_;
   ros::Publisher result_pub_;
   ros::Publisher prev_result_pub_;
   ros::Publisher user_data_from_device_pub_;
@@ -61,6 +67,8 @@ private:
   ros::Subscriber echo_to_device_sub_;
   ros::Subscriber find_sub_;
   ros::Subscriber restart_sub_;
+  ros::Subscriber param_read_sub_;
+  ros::Subscriber param_write_sub_;
   ros::Subscriber begin_pair_sub_;
   ros::Subscriber cancel_pair_sub_;
   ros::Subscriber user_data_to_device_sub_;
