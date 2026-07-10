@@ -4,6 +4,7 @@ set(PKG_NAME fm_dev_driver)
 
 project(${PKG_NAME})
 
+option(FM_BUILD_LOGGER "build logger" ON)
 option(FM_BUILD_ROS1 "build ROS1 converter" OFF)
 option(FM_BUILD_ROS2 "build ROS2 converter" OFF)
 option(FM_BUILD_TEST "build test" OFF)
@@ -60,7 +61,7 @@ if(FM_BUILD_TEST)
   add_subdirectory(test)
 endif()
 
-# 三者都未显式启用时，回退到根据环境变量自动检测
+# 未显式选择ROS版本时，尝试根据环境变量自动检测
 if(NOT FM_BUILD_ROS1 AND NOT FM_BUILD_ROS2)
   if(DEFINED ENV{ROS_VERSION})
     if("$ENV{ROS_VERSION}" STREQUAL "1")
@@ -69,13 +70,6 @@ if(NOT FM_BUILD_ROS1 AND NOT FM_BUILD_ROS2)
       set(FM_BUILD_ROS2 ON)
     endif()
   endif()
-endif()
-
-if(FM_BUILD_ROS1)
-  message(STATUS "build ROS1 Converter")
-endif()
-if(FM_BUILD_ROS2)
-  message(STATUS "build ROS2 Converter")
 endif()
 
 if(FM_BUILD_ROS1)
