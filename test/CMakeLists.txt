@@ -10,5 +10,6 @@ set(INTERNAL_TARGET test_fm_driver_internal)
 add_executable(${INTERNAL_TARGET} test_version_compat.cpp)
 target_link_libraries(${INTERNAL_TARGET} PRIVATE ${LIB_DEV_DRIVER}
                                                  Catch2::Catch2WithMain)
-target_include_directories(${INTERNAL_TARGET} PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(${INTERNAL_TARGET}
+                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 add_test(NAME ${INTERNAL_TARGET} COMMAND ${INTERNAL_TARGET})
