@@ -37,9 +37,6 @@ endif()
 set(LIB_DEV_DRIVER lib_${PKG_NAME})
 add_library(
   ${LIB_DEV_DRIVER} STATIC
-  # 对外公共头
-  include/fm_driver.h
-  # 内部实现
   src/fm_crc.c
   src/fm_crc.h
   src/fm_msg.h
