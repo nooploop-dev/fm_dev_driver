@@ -17,9 +17,9 @@ struct Captured {
 };
 std::vector<Captured> g_msgs;
 
-void on_from_user_msg(bool wired, fm_msg_id_t id, const void *payload,
-                      int size) {
-  (void)wired;
+void on_from_user_msg(fm_connect_type_e connect_type, fm_msg_id_t id,
+                      const void *payload, int size) {
+  (void)connect_type;
   Captured c{};
   c.id = id;
   const uint8_t *p = static_cast<const uint8_t *>(payload);

@@ -23,7 +23,7 @@ typedef enum {
   FM_TAG,
 } fm_role_e;
 
-// 设备连接类型
+// 设备连接类型，可通过直连设备中转，向无线设备收发消息
 typedef enum {
   FM_WIRELESS,
   FM_WIRED,
@@ -248,12 +248,13 @@ typedef void (*fm_on_frame_begin_from_dev_f)(fm_role_e wired_role,
 
 /**
  * @brief 收到数据帧，处理内部消息的回调函数
- * @param wired 消息是否为有线直连节点的
+ * @param connect_type 消息来源的连接类型
  * @param msg_id 消息id(FM_MSG_*)
  * @param msg_payload 消息负载，对应id的结构体指针(FMData*)
  * @param msg_payload_size 消息负载大小
  */
-typedef void (*fm_on_frame_msg_from_dev_f)(bool wired, fm_msg_id_t msg_id,
+typedef void (*fm_on_frame_msg_from_dev_f)(fm_connect_type_e connect_type,
+                                           fm_msg_id_t msg_id,
                                            const void *msg_payload,
                                            int msg_payload_size);
 
@@ -305,7 +306,7 @@ void fm_parser_from_dev_handle_data(FMParserFromDev *parser, const void *data,
  * @param wired_role 设备自身角色(FM_ANCHOR/FM_TAG)
  * @param wired_uid 设备自身uid(长度FM_UID_SIZE)，可传NULL表示全0
  * @param frame_cnt 帧计数，每次需要+1
- * @param wired 消息是否为有线直连节点的
+ * @param connect_type 消息来源的连接类型
  * @param msg_id 消息id(FM_MSG_*)
  * @param msg_payload 消息负载，需传入对应msg_id的结构体指针(FMData*)
  * @param frame 输出数据缓冲区
@@ -313,9 +314,10 @@ void fm_parser_from_dev_handle_data(FMParserFromDev *parser, const void *data,
  * @return int 返回写入的数据大小
  */
 int fm_prepare_msg_to_user(fm_role_e wired_role, const uint8_t *wired_uid,
-                           fm_frame_cnt_t frame_cnt, bool wired,
-                           fm_msg_id_t msg_id, const void *msg_payload,
-                           void *frame, int frame_size_max);
+                           fm_frame_cnt_t frame_cnt,
+                           fm_connect_type_e connect_type, fm_msg_id_t msg_id,
+                           const void *msg_payload, void *frame,
+                           int frame_size_max);
 // 以下为分步骤接口，适用于需要一帧数据中包含多个msg的情况
 // 用法: begin 初始化 -> try_append 追加(可多次) -> end
 // 收尾，frame为同一个缓冲区
@@ -336,14 +338,15 @@ void fm_prepare_msg_to_user_begin(fm_role_e wired_role,
 /**
  * @brief 向当前帧追加一个msg
  *
- * @param wired 消息是否为有线直连节点的
+ * @param connect_type 消息来源的连接类型
  * @param msg_id 消息id(FM_MSG_*)
  * @param msg_payload 消息负载，需传入对应msg_id的结构体指针(FMData*)
  * @param frame 输出数据缓冲区(同begin传入的缓冲)
  * @param frame_size_max 输出数据缓冲区最大大小
  * @return bool true:追加成功; false:剩余空间不足，未追加(应调用end结束当前帧)
  */
-bool fm_prepare_msg_to_user_try_append(bool wired, int msg_id,
+bool fm_prepare_msg_to_user_try_append(fm_connect_type_e connect_type,
+                                       fm_msg_id_t msg_id,
                                        const void *msg_payload, void *frame,
                                        int frame_size_max);
 /**
@@ -363,12 +366,13 @@ typedef void (*fm_on_frame_begin_from_user_f)(fm_frame_cnt_t frame_cnt);
 
 /**
  * @brief 收到数据帧，处理内部消息的回调函数
- * @param wired 消息是否为有线直连节点的
+ * @param connect_type 消息来源的连接类型
  * @param msg_id 消息id(FM_MSG_*)
  * @param msg_payload 消息负载，对应id的结构体指针(FMData*)
  * @param msg_payload_size 消息负载大小
  */
-typedef void (*fm_on_frame_msg_from_user_f)(bool wired, fm_msg_id_t msg_id,
+typedef void (*fm_on_frame_msg_from_user_f)(fm_connect_type_e connect_type,
+                                            fm_msg_id_t msg_id,
                                             const void *msg_payload,
                                             int msg_payload_size);
 
@@ -385,8 +389,8 @@ typedef struct {
   fm_on_frame_msg_from_user_f on_frame_msg;
   fm_on_frame_end_from_user_f on_frame_end;
   // 以下为处理当前帧时的瞬时状态
-  bool wired;               // 当前msg是否为有线直连节点的
-  fm_frame_cnt_t frame_cnt; // 当前帧计数
+  fm_connect_type_e connect_type; // 当前msg的连接类型
+  fm_frame_cnt_t frame_cnt;       // 当前帧计数
 } FMParserFromUser;
 /**
  * @brief 初始化数据解析器

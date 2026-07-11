@@ -26,7 +26,7 @@ public:
 
 private:
   // 收到设备消息的回调(C接口，无arg，路由到单例)
-  static void on_frame_msg(bool wired, fm_msg_id_t msg_id,
+  static void on_frame_msg(fm_connect_type_e connect_type, fm_msg_id_t msg_id,
                            const void *msg_payload, int msg_payload_size);
   // 设备 -> 用户(^)，解析后发布到话题
   void dispatch(const FMDataEcho &data);

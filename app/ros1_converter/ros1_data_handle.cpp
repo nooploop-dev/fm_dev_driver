@@ -215,10 +215,10 @@ void Ros1DataHandle::on_user_data_to_device(
   main_common_send_msg(FM_WIRED, FM_MSG_DATA_USER_TO_USER, &data, sizeof(data));
 }
 
-void Ros1DataHandle::on_frame_msg(bool wired, fm_msg_id_t msg_id,
-                                  const void *msg_payload,
+void Ros1DataHandle::on_frame_msg(fm_connect_type_e connect_type,
+                                  fm_msg_id_t msg_id, const void *msg_payload,
                                   int msg_payload_size) {
-  (void)wired;
+  (void)connect_type;
   (void)msg_payload_size;
   if (!s_self) {
     return;

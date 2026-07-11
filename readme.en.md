@@ -56,10 +56,10 @@ All APIs and message structs are defined in [include/fm_dev_driver.h](include/fm
 #include <stdio.h>
 
 // —— Receiving: invoked once per parsed message reported by the device ——
-// wired=true: the message comes from the wired (directly connected) device;
-// wired=false: it comes from the device on the wireless side
-static void on_frame_msg_from_dev(bool wired, fm_msg_id_t msg_id,
-                                  const void *msg_payload,
+// FM_WIRED: the message comes from the wired (directly connected) device;
+// FM_WIRELESS: it comes from the device on the wireless side
+static void on_frame_msg_from_dev(fm_connect_type_e connect_type,
+                                  fm_msg_id_t msg_id, const void *msg_payload,
                                   int msg_payload_size) {
   switch (msg_id) {
   case FM_MSG_SPHERICAL_RESULT: { // spherical positioning result

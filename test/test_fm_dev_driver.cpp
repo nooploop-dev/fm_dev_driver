@@ -14,6 +14,9 @@ namespace {
 
 using Bytes = std::vector<uint8_t>;
 
+static_assert(FM_WIRELESS == 0);
+static_assert(FM_WIRED == 1);
+
 struct FromDevMsg {
   fm_connect_type_e connect_type;
   fm_role_e role;
@@ -33,7 +36,7 @@ std::vector<FromDevMsg> g_from_dev;
 std::vector<FromUserMsg> g_from_user;
 
 // dev 方向: 帧头(wired_role/uid/cnt)由 on_frame_begin 提供，每个 msg 用
-// wired + wired_role 推导来源连接类型与角色，组装为一条 FromDevMsg
+// connect_type + wired_role 推导所属角色，组装为一条 FromDevMsg
 fm_role_e g_dev_wired_role;
 uint8_t g_dev_uid[FM_UID_SIZE];
 fm_frame_cnt_t g_dev_cnt;
@@ -45,12 +48,13 @@ void on_from_dev_begin(fm_role_e wired_role, const uint8_t *uid,
   g_dev_cnt = cnt;
 }
 
-void on_from_dev_msg(bool wired, fm_msg_id_t id, const void *payload,
-                     int size) {
+void on_from_dev_msg(fm_connect_type_e connect_type, fm_msg_id_t id,
+                     const void *payload, int size) {
   FromDevMsg m{};
-  m.connect_type = wired ? FM_WIRED : FM_WIRELESS;
-  m.role = wired ? g_dev_wired_role
-                 : (g_dev_wired_role == FM_ANCHOR ? FM_TAG : FM_ANCHOR);
+  m.connect_type = connect_type;
+  m.role = connect_type == FM_WIRED
+               ? g_dev_wired_role
+               : (g_dev_wired_role == FM_ANCHOR ? FM_TAG : FM_ANCHOR);
   std::memcpy(m.uid, g_dev_uid, FM_UID_SIZE);
   m.cnt = g_dev_cnt;
   m.id = id;
@@ -68,10 +72,10 @@ fm_frame_cnt_t g_user_cnt;
 
 void on_from_user_begin(fm_frame_cnt_t cnt) { g_user_cnt = cnt; }
 
-void on_from_user_msg(bool wired, fm_msg_id_t id, const void *payload,
-                      int size) {
+void on_from_user_msg(fm_connect_type_e connect_type, fm_msg_id_t id,
+                      const void *payload, int size) {
   FromUserMsg m{};
-  m.connect_type = wired ? FM_WIRED : FM_WIRELESS;
+  m.connect_type = connect_type;
   m.cnt = g_user_cnt;
   m.id = id;
   const uint8_t *p = static_cast<const uint8_t *>(payload);
@@ -107,10 +111,10 @@ Bytes build_to_dev(fm_connect_type_e ct, fm_frame_cnt_t cnt, fm_msg_id_t id,
 }
 
 Bytes build_to_user(fm_role_e role, const uint8_t *uid, fm_frame_cnt_t cnt,
-                    bool wired, fm_msg_id_t id, const void *payload) {
+                    fm_connect_type_e ct, fm_msg_id_t id, const void *payload) {
   uint8_t buf[FM_FRAME_SIZE_MAX];
-  return to_bytes(buf, fm_prepare_msg_to_user(role, uid, cnt, wired, id,
-                                              payload, buf, sizeof(buf)));
+  return to_bytes(buf, fm_prepare_msg_to_user(role, uid, cnt, ct, id, payload,
+                                              buf, sizeof(buf)));
 }
 
 // 多 msg 单帧构造(begin -> try_append... -> end) -----------------------------
@@ -132,7 +136,7 @@ Bytes build_to_dev_multi(fm_frame_cnt_t cnt,
 }
 
 struct ToUserMsg {
-  bool wired;
+  fm_connect_type_e ct;
   fm_msg_id_t id;
   const void *payload;
 };
@@ -142,7 +146,7 @@ Bytes build_to_user_multi(fm_role_e role, const uint8_t *uid,
   uint8_t buf[FM_FRAME_SIZE_MAX];
   fm_prepare_msg_to_user_begin(role, uid, cnt, buf, sizeof(buf));
   for (const ToUserMsg &m : msgs) {
-    REQUIRE(fm_prepare_msg_to_user_try_append(m.wired, m.id, m.payload, buf,
+    REQUIRE(fm_prepare_msg_to_user_try_append(m.ct, m.id, m.payload, buf,
                                               sizeof(buf)));
   }
   return to_bytes(buf, fm_prepare_msg_to_user_end(buf, sizeof(buf)));
@@ -283,7 +287,7 @@ TEST_CASE("dev->user round trip") {
     d.dis = 2.5f;
     d.rx_rate = 4;
 
-    p.feed(build_to_user(FM_TAG, uid, cnt, true, FM_MSG_DIS, &d));
+    p.feed(build_to_user(FM_TAG, uid, cnt, FM_WIRED, FM_MSG_DIS, &d));
 
     REQUIRE(g_from_dev.size() == 1);
     const FromDevMsg &m = g_from_dev[0];
@@ -314,8 +318,8 @@ TEST_CASE("dev->user round trip") {
 
     p.feed(build_to_user_multi(FM_ANCHOR, uid, cnt,
                                {
-                                   {true, FM_MSG_DIS, &d},
-                                   {true, FM_MSG_SPHERICAL_RESULT, &s},
+                                   {FM_WIRED, FM_MSG_DIS, &d},
+                                   {FM_WIRED, FM_MSG_SPHERICAL_RESULT, &s},
                                }));
 
     REQUIRE(g_from_dev.size() == 2);
@@ -342,12 +346,12 @@ TEST_CASE("dev->user round trip") {
     d.cnt = 1;
     d.dis = 1.0f;
 
-    // wired=false 的消息被包进内部无线封装，解析端拆包后按无线来源上报
-    // (角色翻转)；其后 wired=true 的消息不应受前一条无线消息影响
+    // FM_WIRELESS 的消息被包进内部无线封装，解析端拆包后按无线来源上报
+    // (角色翻转)；其后 FM_WIRED 的消息不应受前一条无线消息影响
     p.feed(build_to_user_multi(FM_ANCHOR, uid, cnt,
                                {
-                                   {false, FM_MSG_SPHERICAL_RESULT, &s},
-                                   {true, FM_MSG_DIS, &d},
+                                   {FM_WIRELESS, FM_MSG_SPHERICAL_RESULT, &s},
+                                   {FM_WIRED, FM_MSG_DIS, &d},
                                }));
 
     REQUIRE(g_from_dev.size() == 2);
@@ -440,7 +444,7 @@ TEST_CASE("from_dev frame parsing") {
     d.cnt = cnt;
     d.rx_rate = rate;
     d.dis = 1.0f;
-    return build_to_user(FM_TAG, uid, cnt, true, FM_MSG_DIS, &d);
+    return build_to_user(FM_TAG, uid, cnt, FM_WIRED, FM_MSG_DIS, &d);
   };
 
   SECTION("concatenated frames fed byte by byte") {
@@ -658,20 +662,20 @@ void check_user_to_dev(fm_connect_type_e ct, const MsgCase &c) {
   REQUIRE(frame1 == frame2);
 }
 
-void check_dev_to_user(fm_role_e role, const uint8_t *uid, bool wired,
+void check_dev_to_user(fm_role_e role, const uint8_t *uid, fm_connect_type_e ct,
                        const MsgCase &c) {
-  INFO("dev->user msg=" << c.name << " wired=" << wired);
+  INFO("dev->user msg=" << c.name
+                        << " ct=" << (ct == FM_WIRED ? "WIRED" : "WIRELESS"));
   const fm_frame_cnt_t cnt = 0x5A;
   FromDevParser p;
   const void *in = c.payload.empty() ? nullptr : c.payload.data();
-  Bytes frame1 = build_to_user(role, uid, cnt, wired, c.id, in);
+  Bytes frame1 = build_to_user(role, uid, cnt, ct, c.id, in);
   p.feed(frame1);
 
-  // user_to_user 无论怎么组包解析端都按无线对端上报，其余消息按组包时的wired
-  const bool expect_wired = c.flips_role ? false : wired;
+  // user_to_user 无论怎么组包解析端都按无线对端上报，其余按组包时的连接类型
+  const fm_connect_type_e expect_ct = c.flips_role ? FM_WIRELESS : ct;
   const fm_role_e expect_role =
-      expect_wired ? role : (role == FM_ANCHOR ? FM_TAG : FM_ANCHOR);
-  const fm_connect_type_e expect_ct = expect_wired ? FM_WIRED : FM_WIRELESS;
+      expect_ct == FM_WIRED ? role : (role == FM_ANCHOR ? FM_TAG : FM_ANCHOR);
   REQUIRE(g_from_dev.size() == 1);
   REQUIRE(g_from_dev[0].id == c.id);
   REQUIRE(g_from_dev[0].cnt == cnt);
@@ -682,7 +686,7 @@ void check_dev_to_user(fm_role_e role, const uint8_t *uid, bool wired,
 
   const void *dec =
       g_from_dev[0].payload.empty() ? nullptr : g_from_dev[0].payload.data();
-  Bytes frame2 = build_to_user(role, uid, cnt, wired, c.id, dec);
+  Bytes frame2 = build_to_user(role, uid, cnt, ct, c.id, dec);
   REQUIRE(frame1 == frame2);
 }
 
@@ -695,10 +699,33 @@ TEST_CASE("user->dev: every message single round trip (WIRED & WIRELESS)") {
   }
 }
 
-TEST_CASE("dev->user: every message single round trip (wired & wireless)") {
+TEST_CASE("dev->user: every message single round trip (WIRED & WIRELESS)") {
   const uint8_t uid[FM_UID_SIZE] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
   for (const MsgCase &c : dev_to_user_cases()) {
-    check_dev_to_user(FM_TAG, uid, true, c);
-    check_dev_to_user(FM_TAG, uid, false, c);
+    check_dev_to_user(FM_TAG, uid, FM_WIRED, c);
+    check_dev_to_user(FM_TAG, uid, FM_WIRELESS, c);
+  }
+}
+
+TEST_CASE("message builders reject invalid connect type") {
+  const auto invalid = static_cast<fm_connect_type_e>(2);
+  const uint8_t uid[FM_UID_SIZE] = {};
+  FMDataEcho echo{};
+  uint8_t frame[FM_FRAME_SIZE_MAX];
+
+  SECTION("user->dev") {
+    fm_prepare_msg_to_dev_begin(1, frame, sizeof(frame));
+    REQUIRE_FALSE(fm_prepare_msg_to_dev_try_append(invalid, FM_MSG_ECHO, &echo,
+                                                   frame, sizeof(frame)));
+    REQUIRE(fm_prepare_msg_to_dev(invalid, 1, FM_MSG_ECHO, &echo, frame,
+                                  sizeof(frame)) == 0);
+  }
+
+  SECTION("dev->user") {
+    fm_prepare_msg_to_user_begin(FM_ANCHOR, uid, 1, frame, sizeof(frame));
+    REQUIRE_FALSE(fm_prepare_msg_to_user_try_append(invalid, FM_MSG_ECHO, &echo,
+                                                    frame, sizeof(frame)));
+    REQUIRE(fm_prepare_msg_to_user(FM_ANCHOR, uid, 1, invalid, FM_MSG_ECHO,
+                                   &echo, frame, sizeof(frame)) == 0);
   }
 }

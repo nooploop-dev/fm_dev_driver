@@ -58,12 +58,12 @@ void on_frame_begin(fm_role_e wired_role, const uint8_t *wired_uid,
   s_frame_suffix =
       fmt::format("{},{}", data2hex(wired_uid, FM_UID_SIZE), frame_cnt);
 }
-void on_frame_msg(bool wired, fm_msg_id_t msg_id, const void *msg_payload,
-                  int msg_payload_size) {
-  // 消息来源: wired 为真表示来自有线直连节点，否则来自无线对端(角色翻转)
-  fm_connect_type_e connect_type = wired ? FM_WIRED : FM_WIRELESS;
-  fm_role_e role =
-      wired ? s_wired_role : (s_wired_role == FM_ANCHOR ? FM_TAG : FM_ANCHOR);
+void on_frame_msg(fm_connect_type_e connect_type, fm_msg_id_t msg_id,
+                  const void *msg_payload, int msg_payload_size) {
+  // 消息来源: FM_WIRED 为有线直连节点，否则为无线对端(角色翻转)
+  fm_role_e role = connect_type == FM_WIRED
+                       ? s_wired_role
+                       : (s_wired_role == FM_ANCHOR ? FM_TAG : FM_ANCHOR);
   auto s_header = fmt::format("{},{},{}", connect_type_name(connect_type),
                               role_name(role), s_frame_suffix);
   switch (msg_id) {

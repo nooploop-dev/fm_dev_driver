@@ -56,9 +56,10 @@ fm_dev_driver/
 #include <stdio.h>
 
 // —— 接收：每解析出一条设备上报的消息时被回调 ——
-// wired 为 true 表示消息来自有线直连的设备，false 表示来自无线侧的设备
-static void on_frame_msg_from_dev(bool wired, fm_msg_id_t msg_id,
-                                  const void *msg_payload,
+// connect_type 为 FM_WIRED 表示消息来自有线直连的设备，
+// FM_WIRELESS 表示来自无线侧的设备
+static void on_frame_msg_from_dev(fm_connect_type_e connect_type,
+                                  fm_msg_id_t msg_id, const void *msg_payload,
                                   int msg_payload_size) {
   switch (msg_id) {
   case FM_MSG_SPHERICAL_RESULT: { // 球坐标定位结果

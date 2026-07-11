@@ -107,8 +107,7 @@ static int fm_dev_to_user_encode(fm_msg_id_t msg_id, const void *app,
     APPTYPE a;                                                                 \
     FROM(&p, &a);                                                              \
     if (parser->on_frame_msg) {                                                \
-      parser->on_frame_msg(parser->role == parser->wired_role, msg->id, &a,    \
-                           (int)sizeof(a));                                    \
+      parser->on_frame_msg(parser->connect_type, msg->id, &a, (int)sizeof(a)); \
     }                                                                          \
   } while (0)
 
@@ -136,7 +135,8 @@ static void fm_parser_from_dev_user_to_user(FMParserFromDev *parser,
   fm_data_user_to_user_from_raw(&ud, &a);
   if (parser->on_frame_msg) {
     // user_to_user 恒为无线对端用户的数据
-    parser->on_frame_msg(false, FM_MSG_DATA_USER_TO_USER, &a, (int)sizeof(a));
+    parser->on_frame_msg(FM_WIRELESS, FM_MSG_DATA_USER_TO_USER, &a,
+                         (int)sizeof(a));
   }
 }
 
@@ -208,7 +208,7 @@ static void fm_dev_to_user_decode(void *arg, const FMData *msg) {
     APPTYPE a;                                                                 \
     FROM(&p, &a);                                                              \
     if (parser->on_frame_msg) {                                                \
-      parser->on_frame_msg(parser->wired, msg->id, &a, (int)sizeof(a));        \
+      parser->on_frame_msg(parser->connect_type, msg->id, &a, (int)sizeof(a)); \
     }                                                                          \
   } while (0)
 
@@ -219,11 +219,11 @@ static void fm_parser_from_user_user_to_dev(FMParserFromUser *parser,
                                             const FMData *msg) {
   const FMRawDataDataUserToDev *ud =
       (const FMRawDataDataUserToDev *)msg->payload;
-  parser->wired = false;
+  parser->connect_type = FM_WIRELESS;
   fm_msg_parser_handle_data(&fm_user_to_dev_decode, parser, ud->payload,
                             ud->payload_size);
   // 恢复瞬时状态，同帧后续消息仍属于有线直连节点
-  parser->wired = true;
+  parser->connect_type = FM_WIRED;
 }
 
 static void fm_parser_from_user_user_to_user(FMParserFromUser *parser,
@@ -233,7 +233,7 @@ static void fm_parser_from_user_user_to_user(FMParserFromUser *parser,
   FMDataDataUserToUser a;
   fm_data_user_to_user_from_raw(&ud, &a);
   if (parser->on_frame_msg) {
-    parser->on_frame_msg(parser->wired, FM_MSG_DATA_USER_TO_USER, &a,
+    parser->on_frame_msg(parser->connect_type, FM_MSG_DATA_USER_TO_USER, &a,
                          (int)sizeof(a));
   }
 }
@@ -244,7 +244,7 @@ static void fm_user_to_dev_decode(void *arg, const FMData *msg) {
   // 无负载的读取命令
   case FM_MSG_PARAM_READ:
     if (parser->on_frame_msg) {
-      parser->on_frame_msg(parser->wired, msg->id, NULL, 0);
+      parser->on_frame_msg(parser->connect_type, msg->id, NULL, 0);
     }
     break;
   case FM_MSG_ECHO:
@@ -280,9 +280,16 @@ static void fm_user_to_dev_decode(void *arg, const FMData *msg) {
   }
 }
 
+static bool fm_connect_type_is_valid(fm_connect_type_e connect_type) {
+  return connect_type == FM_WIRED || connect_type == FM_WIRELESS;
+}
+
 static int fm_build_msg_to_dev(fm_connect_type_e connect_type,
                                fm_msg_id_t msg_id, const void *msg_payload,
                                uint8_t *out) {
+  if (!fm_connect_type_is_valid(connect_type)) {
+    return 0;
+  }
   uint8_t proto[FM_MSG_PAYLOAD_SIZE_MAX];
   int proto_size = fm_user_to_dev_encode(msg_id, msg_payload, proto);
   if (connect_type == FM_WIRED) {
@@ -301,8 +308,10 @@ int fm_prepare_msg_to_dev(fm_connect_type_e connect_type,
                           const void *msg_payload, void *frame,
                           int frame_size_max) {
   fm_prepare_msg_to_dev_begin(frame_cnt, frame, frame_size_max);
-  fm_prepare_msg_to_dev_try_append(connect_type, msg_id, msg_payload, frame,
-                                   frame_size_max);
+  if (!fm_prepare_msg_to_dev_try_append(connect_type, msg_id, msg_payload,
+                                        frame, frame_size_max)) {
+    return 0;
+  }
   return fm_prepare_msg_to_dev_end(frame, frame_size_max);
 }
 
@@ -323,6 +332,9 @@ bool fm_prepare_msg_to_dev_try_append(fm_connect_type_e connect_type,
   uint8_t msg_buf[FM_FRAME_SIZE_MAX];
   int appended =
       fm_build_msg_to_dev(connect_type, msg_id, msg_payload, msg_buf);
+  if (appended <= 0) {
+    return false;
+  }
   int new_payload_size = (int)f->payload_size + appended;
   if (new_payload_size > FM_FRAME_USER_TO_DEV_PAYLOAD_SIZE_MAX) {
     return false;
@@ -342,11 +354,15 @@ int fm_prepare_msg_to_dev_end(void *frame, int frame_size_max) {
   return fm_frame_user_to_dev_bytes(f);
 }
 
-static int fm_build_msg_to_user(bool wired, fm_msg_id_t msg_id,
-                                const void *msg_payload, uint8_t *out) {
+static int fm_build_msg_to_user(fm_connect_type_e connect_type,
+                                fm_msg_id_t msg_id, const void *msg_payload,
+                                uint8_t *out) {
+  if (!fm_connect_type_is_valid(connect_type)) {
+    return 0;
+  }
   uint8_t proto[FM_MSG_PAYLOAD_SIZE_MAX];
   int proto_size = fm_dev_to_user_encode(msg_id, msg_payload, proto);
-  if (wired) {
+  if (connect_type == FM_WIRED) {
     return fm_msg_write(out, msg_id, proto, proto_size);
   }
   // 无线侧消息需要先包一层dev_to_user
@@ -358,13 +374,16 @@ static int fm_build_msg_to_user(bool wired, fm_msg_id_t msg_id,
 }
 
 int fm_prepare_msg_to_user(fm_role_e wired_role, const uint8_t *wired_uid,
-                           fm_frame_cnt_t frame_cnt, bool wired,
-                           fm_msg_id_t msg_id, const void *msg_payload,
-                           void *frame, int frame_size_max) {
+                           fm_frame_cnt_t frame_cnt,
+                           fm_connect_type_e connect_type, fm_msg_id_t msg_id,
+                           const void *msg_payload, void *frame,
+                           int frame_size_max) {
   fm_prepare_msg_to_user_begin(wired_role, wired_uid, frame_cnt, frame,
                                frame_size_max);
-  fm_prepare_msg_to_user_try_append(wired, msg_id, msg_payload, frame,
-                                    frame_size_max);
+  if (!fm_prepare_msg_to_user_try_append(connect_type, msg_id, msg_payload,
+                                         frame, frame_size_max)) {
+    return 0;
+  }
   return fm_prepare_msg_to_user_end(frame, frame_size_max);
 }
 
@@ -386,13 +405,17 @@ void fm_prepare_msg_to_user_begin(fm_role_e wired_role,
   f->payload_size = 0;
 }
 
-bool fm_prepare_msg_to_user_try_append(bool wired, int msg_id,
+bool fm_prepare_msg_to_user_try_append(fm_connect_type_e connect_type,
+                                       fm_msg_id_t msg_id,
                                        const void *msg_payload, void *frame,
                                        int frame_size_max) {
   FMFrameDevToUser *f = (FMFrameDevToUser *)frame;
   uint8_t msg_buf[FM_FRAME_SIZE_MAX];
   int appended =
-      fm_build_msg_to_user(wired, (fm_msg_id_t)msg_id, msg_payload, msg_buf);
+      fm_build_msg_to_user(connect_type, msg_id, msg_payload, msg_buf);
+  if (appended <= 0) {
+    return false;
+  }
   int new_payload_size = (int)f->payload_size + appended;
   if (new_payload_size > FM_FRAME_DEV_TO_USER_PAYLOAD_SIZE_MAX) {
     return false;
@@ -455,7 +478,7 @@ static void fm_parser_from_user_on_frame(void *arg, const void *frame,
   (void)frame_size;
   FMParserFromUser *parser = (FMParserFromUser *)arg;
   const FMFrameUserToDev *f = (const FMFrameUserToDev *)frame;
-  parser->wired = true;
+  parser->connect_type = FM_WIRED;
   parser->frame_cnt = f->cnt;
   if (parser->on_frame_begin) {
     parser->on_frame_begin(parser->frame_cnt);
