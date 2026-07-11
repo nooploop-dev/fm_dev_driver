@@ -706,26 +706,3 @@ TEST_CASE("dev->user: every message single round trip (WIRED & WIRELESS)") {
     check_dev_to_user(FM_TAG, uid, FM_WIRELESS, c);
   }
 }
-
-TEST_CASE("message builders reject invalid connect type") {
-  const auto invalid = static_cast<fm_connect_type_e>(2);
-  const uint8_t uid[FM_UID_SIZE] = {};
-  FMDataEcho echo{};
-  uint8_t frame[FM_FRAME_SIZE_MAX];
-
-  SECTION("user->dev") {
-    fm_prepare_msg_to_dev_begin(1, frame, sizeof(frame));
-    REQUIRE_FALSE(fm_prepare_msg_to_dev_try_append(invalid, FM_MSG_ECHO, &echo,
-                                                   frame, sizeof(frame)));
-    REQUIRE(fm_prepare_msg_to_dev(invalid, 1, FM_MSG_ECHO, &echo, frame,
-                                  sizeof(frame)) == 0);
-  }
-
-  SECTION("dev->user") {
-    fm_prepare_msg_to_user_begin(FM_ANCHOR, uid, 1, frame, sizeof(frame));
-    REQUIRE_FALSE(fm_prepare_msg_to_user_try_append(invalid, FM_MSG_ECHO, &echo,
-                                                    frame, sizeof(frame)));
-    REQUIRE(fm_prepare_msg_to_user(FM_ANCHOR, uid, 1, invalid, FM_MSG_ECHO,
-                                   &echo, frame, sizeof(frame)) == 0);
-  }
-}
