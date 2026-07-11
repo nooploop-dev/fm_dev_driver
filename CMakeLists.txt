@@ -4,7 +4,7 @@ set(PKG_NAME fm_dev_driver)
 
 project(${PKG_NAME})
 
-option(FM_BUILD_LOGGER "build logger" ON)
+option(FM_BUILD_READER "build reader" ON)
 option(FM_BUILD_ROS1 "build ROS1 converter" OFF)
 option(FM_BUILD_ROS2 "build ROS2 converter" OFF)
 option(FM_BUILD_TEST "build test" OFF)

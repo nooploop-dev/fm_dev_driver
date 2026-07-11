@@ -12,9 +12,9 @@ add_library(${LIB_COMMON} STATIC serial_port.cpp serial_port.hpp
 target_include_directories(${LIB_COMMON} PUBLIC .)
 target_link_libraries(${LIB_COMMON} PUBLIC ${LIB_DEV_DRIVER} asio)
 
-if(FM_BUILD_LOGGER)
-  message(STATUS "build Logger")
-  add_subdirectory(logger)
+if(FM_BUILD_READER)
+  message(STATUS "build reader")
+  add_subdirectory(reader)
 endif()
 
 if(FM_BUILD_ROS1)
