@@ -119,12 +119,10 @@ static void fm_parser_from_dev_dev_to_user(FMParserFromDev *parser,
   const FMRawDataDataDevToUser *ud =
       (const FMRawDataDataDevToUser *)msg->payload;
   parser->connect_type = FM_WIRELESS;
-  parser->role = (parser->wired_role == FM_ANCHOR) ? FM_TAG : FM_ANCHOR;
   fm_msg_parser_handle_data(&fm_dev_to_user_decode, parser, ud->payload,
                             ud->payload_size);
   // 恢复瞬时状态，同帧后续消息仍属于有线直连节点
   parser->connect_type = FM_WIRED;
-  parser->role = parser->wired_role;
 }
 
 static void fm_parser_from_dev_user_to_user(FMParserFromDev *parser,
@@ -442,7 +440,6 @@ static void fm_parser_from_dev_on_frame(void *arg, const void *frame,
   const FMFrameDevToUser *f = (const FMFrameDevToUser *)frame;
   parser->connect_type = FM_WIRED;
   parser->wired_role = f->role;
-  parser->role = parser->wired_role;
   parser->frame_cnt = f->cnt;
   memcpy(parser->wired_uid, f->uid, FM_UID_SIZE);
   if (parser->on_frame_begin) {

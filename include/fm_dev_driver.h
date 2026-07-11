@@ -271,11 +271,10 @@ typedef struct {
   fm_on_frame_msg_from_dev_f on_frame_msg;
   fm_on_frame_end_from_dev_f on_frame_end;
   // 以下为处理当前帧时的瞬时状态
-  fm_connect_type_e connect_type; // 当前msg的连接类型
-  fm_role_e role;                 // 当前msg所属角色
   fm_role_e wired_role;           // 有线连接节点的角色
-  fm_frame_cnt_t frame_cnt;       // 当前帧计数
   uint8_t wired_uid[FM_UID_SIZE]; // 有线连接节点的uid
+  fm_frame_cnt_t frame_cnt;       // 当前帧计数
+  fm_connect_type_e connect_type; // 当前msg的连接类型
 } FMParserFromDev;
 /**
  * @brief 初始化数据解析器
@@ -389,8 +388,8 @@ typedef struct {
   fm_on_frame_msg_from_user_f on_frame_msg;
   fm_on_frame_end_from_user_f on_frame_end;
   // 以下为处理当前帧时的瞬时状态
-  fm_connect_type_e connect_type; // 当前msg的连接类型
   fm_frame_cnt_t frame_cnt;       // 当前帧计数
+  fm_connect_type_e connect_type; // 当前msg的连接类型
 } FMParserFromUser;
 /**
  * @brief 初始化数据解析器
