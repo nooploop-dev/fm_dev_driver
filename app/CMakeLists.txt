@@ -12,9 +12,24 @@ add_library(${LIB_COMMON} STATIC serial_port.cpp serial_port.hpp
 target_include_directories(${LIB_COMMON} PUBLIC .)
 target_link_libraries(${LIB_COMMON} PUBLIC ${LIB_DEV_DRIVER} asio)
 
+if(FM_BUILD_READER OR FM_BUILD_WRITER)
+  if(NOT TARGET spdlog)
+    FetchContent_Declare(
+      spdlog
+      GIT_REPOSITORY https://github.com/gabime/spdlog.git
+      GIT_TAG v1.15.3)
+    FetchContent_MakeAvailable(spdlog)
+  endif()
+endif()
+
 if(FM_BUILD_READER)
   message(STATUS "build reader")
   add_subdirectory(reader)
+endif()
+
+if(FM_BUILD_WRITER)
+  message(STATUS "build writer")
+  add_subdirectory(writer)
 endif()
 
 if(FM_BUILD_ROS1)
