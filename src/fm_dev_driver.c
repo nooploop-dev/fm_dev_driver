@@ -4,6 +4,7 @@
 #include "fm_dev_frame.h"
 #include "fm_dev_msg.h"
 #include <assert.h>
+#include <stddef.h>
 #include <string.h>
 
 // 无线封装消息不对外暴露，但协议层仍使用固定 ID。
@@ -278,27 +279,32 @@ static void fm_user_to_dev_decode(void *arg, const FMData *msg) {
   }
 }
 
-static bool fm_connect_type_is_valid(fm_connect_type_e connect_type) {
-  return connect_type == FM_WIRED || connect_type == FM_WIRELESS;
-}
-
+// 将单条消息直接构建到out(容量out_size_max)，任何写入前先校验容量，
+// 容量不足时不写入并返回0，成功返回写入的字节数
 static int fm_build_msg_to_dev(fm_connect_type_e connect_type,
                                fm_msg_id_t msg_id, const void *msg_payload,
-                               uint8_t *out) {
-  if (!fm_connect_type_is_valid(connect_type)) {
+                               uint8_t *out, int out_size_max) {
+  uint8_t raw_data[FM_MSG_PAYLOAD_SIZE_MAX];
+  int raw_data_size = fm_user_to_dev_encode(msg_id, msg_payload, raw_data);
+  if (connect_type == FM_WIRED) {
+    if (FM_MSG_HEADER_SIZE + raw_data_size > out_size_max) {
+      return 0;
+    }
+    return fm_msg_write(out, msg_id, raw_data, raw_data_size);
+  }
+  // 无线下发需要先包一层user_data: 按最终布局在out上就地写入
+  FMData *outer = (FMData *)out;
+  FMRawDataDataUserToDev *ud = (FMRawDataDataUserToDev *)outer->payload;
+  int ud_size = offsetof(FMRawDataDataUserToDev, payload) + FM_MSG_HEADER_SIZE +
+                raw_data_size;
+  if (FM_MSG_HEADER_SIZE + ud_size > out_size_max) {
     return 0;
   }
-  uint8_t proto[FM_MSG_PAYLOAD_SIZE_MAX];
-  int proto_size = fm_user_to_dev_encode(msg_id, msg_payload, proto);
-  if (connect_type == FM_WIRED) {
-    return fm_msg_write(out, msg_id, proto, proto_size);
-  }
-  // 无线下发需要先包一层user_data
-  FMRawDataDataUserToDev ud;
-  ud.payload_size =
-      (uint8_t)fm_msg_write(ud.payload, msg_id, proto, proto_size);
-  return fm_msg_write(out, FM_MSG_INTERNAL_DATA_USER_TO_DEV, &ud,
-                      FM_PAYLOAD_VALID_SIZE(ud));
+  ud->payload_size =
+      (uint8_t)fm_msg_write(ud->payload, msg_id, raw_data, raw_data_size);
+  outer->id = FM_MSG_INTERNAL_DATA_USER_TO_DEV;
+  outer->payload_size = ud_size;
+  return FM_MSG_HEADER_SIZE + ud_size;
 }
 
 int fm_prepare_msg_to_dev(fm_connect_type_e connect_type,
@@ -327,21 +333,14 @@ bool fm_prepare_msg_to_dev_try_append(fm_connect_type_e connect_type,
                                       const void *msg_payload, void *frame,
                                       int frame_size_max) {
   FMFrameUserToDev *f = (FMFrameUserToDev *)frame;
-  uint8_t msg_buf[FM_FRAME_SIZE_MAX];
+  int f_payload_available = frame_size_max - fm_frame_user_to_dev_bytes(f);
   int appended =
-      fm_build_msg_to_dev(connect_type, msg_id, msg_payload, msg_buf);
+      fm_build_msg_to_dev(connect_type, msg_id, msg_payload,
+                          f->payload + f->payload_size, f_payload_available);
   if (appended <= 0) {
     return false;
   }
-  int new_payload_size = (int)f->payload_size + appended;
-  if (new_payload_size > FM_FRAME_USER_TO_DEV_PAYLOAD_SIZE_MAX) {
-    return false;
-  }
-  if (FM_FRAME_USER_TO_DEV_SIZE_MIN + new_payload_size > frame_size_max) {
-    return false;
-  }
-  memcpy(f->payload + f->payload_size, msg_buf, appended);
-  f->payload_size = (fm_frame_payload_size_t)new_payload_size;
+  f->payload_size = f->payload_size + appended;
   return true;
 }
 
@@ -352,23 +351,32 @@ int fm_prepare_msg_to_dev_end(void *frame, int frame_size_max) {
   return fm_frame_user_to_dev_bytes(f);
 }
 
+// 将单条消息直接构建到out(容量out_size_max)，任何写入前先校验容量，
+// 容量不足时不写入并返回0，成功返回写入的字节数
 static int fm_build_msg_to_user(fm_connect_type_e connect_type,
                                 fm_msg_id_t msg_id, const void *msg_payload,
-                                uint8_t *out) {
-  if (!fm_connect_type_is_valid(connect_type)) {
+                                uint8_t *out, int out_size_max) {
+  uint8_t raw_data[FM_MSG_PAYLOAD_SIZE_MAX];
+  int raw_data_size = fm_dev_to_user_encode(msg_id, msg_payload, raw_data);
+  if (connect_type == FM_WIRED) {
+    if (FM_MSG_HEADER_SIZE + raw_data_size > out_size_max) {
+      return 0;
+    }
+    return fm_msg_write(out, msg_id, raw_data, raw_data_size);
+  }
+  // 无线侧消息需要先包一层dev_to_user: 按最终布局在out上就地写入
+  FMData *outer = (FMData *)out;
+  FMRawDataDataDevToUser *ud = (FMRawDataDataDevToUser *)outer->payload;
+  int ud_size = offsetof(FMRawDataDataDevToUser, payload) + FM_MSG_HEADER_SIZE +
+                raw_data_size;
+  if (FM_MSG_HEADER_SIZE + ud_size > out_size_max) {
     return 0;
   }
-  uint8_t proto[FM_MSG_PAYLOAD_SIZE_MAX];
-  int proto_size = fm_dev_to_user_encode(msg_id, msg_payload, proto);
-  if (connect_type == FM_WIRED) {
-    return fm_msg_write(out, msg_id, proto, proto_size);
-  }
-  // 无线侧消息需要先包一层dev_to_user
-  FMRawDataDataDevToUser ud;
-  ud.payload_size =
-      (uint8_t)fm_msg_write(ud.payload, msg_id, proto, proto_size);
-  return fm_msg_write(out, FM_MSG_INTERNAL_DATA_DEV_TO_USER, &ud,
-                      FM_PAYLOAD_VALID_SIZE(ud));
+  ud->payload_size =
+      (uint8_t)fm_msg_write(ud->payload, msg_id, raw_data, raw_data_size);
+  outer->id = FM_MSG_INTERNAL_DATA_DEV_TO_USER;
+  outer->payload_size = ud_size;
+  return FM_MSG_HEADER_SIZE + ud_size;
 }
 
 int fm_prepare_msg_to_user(fm_role_e wired_role, const uint8_t *wired_uid,
@@ -408,21 +416,14 @@ bool fm_prepare_msg_to_user_try_append(fm_connect_type_e connect_type,
                                        const void *msg_payload, void *frame,
                                        int frame_size_max) {
   FMFrameDevToUser *f = (FMFrameDevToUser *)frame;
-  uint8_t msg_buf[FM_FRAME_SIZE_MAX];
+  int f_payload_available = frame_size_max - fm_frame_dev_to_user_bytes(f);
   int appended =
-      fm_build_msg_to_user(connect_type, msg_id, msg_payload, msg_buf);
+      fm_build_msg_to_user(connect_type, msg_id, msg_payload,
+                           f->payload + f->payload_size, f_payload_available);
   if (appended <= 0) {
     return false;
   }
-  int new_payload_size = (int)f->payload_size + appended;
-  if (new_payload_size > FM_FRAME_DEV_TO_USER_PAYLOAD_SIZE_MAX) {
-    return false;
-  }
-  if (FM_FRAME_DEV_TO_USER_SIZE_MIN + new_payload_size > frame_size_max) {
-    return false;
-  }
-  memcpy(f->payload + f->payload_size, msg_buf, appended);
-  f->payload_size = (fm_frame_payload_size_t)new_payload_size;
+  f->payload_size = f->payload_size + appended;
   return true;
 }
 
