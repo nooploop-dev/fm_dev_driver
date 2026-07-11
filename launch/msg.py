@@ -10,7 +10,7 @@ def generate_launch_description():
             DeclareLaunchArgument("port", default_value="/dev/ttyACM0"),
             DeclareLaunchArgument("baudrate", default_value="921600"),
             Node(
-                package="fm_dev_driver",
+                package="fm_driver",
                 executable="ros_converter",
                 name="ros_converter",
                 output="screen",

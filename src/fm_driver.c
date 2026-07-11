@@ -1,8 +1,8 @@
-#include "fm_dev_driver.h"
-#include "fm_dev_crc.h"
-#include "fm_dev_driver_raw.h"
-#include "fm_dev_frame.h"
-#include "fm_dev_msg.h"
+#include "fm_crc.h"
+#include "fm_driver.h"
+#include "fm_driver_raw.h"
+#include "fm_frame.h"
+#include "fm_msg.h"
 #include <assert.h>
 #include <stddef.h>
 #include <string.h>

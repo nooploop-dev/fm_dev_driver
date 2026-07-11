@@ -10,15 +10,15 @@ This repository contains the driver code for the Nooploop [AOA Follow Me](https:
 ## Directory Structure
 
 ```text
-fm_dev_driver/
-├── include/fm_dev_driver.h   # The only public header (the only file you need to care about)
+fm_driver/
+├── include/fm_driver.h   # The only public header (the only file you need to care about)
 ├── src/                      # Pure C driver implementation (must be compiled together)
-│   ├── fm_dev_crc.c/.h       #   CRC checksum
-│   ├── fm_dev_frame.c/.h     #   Frame assembly/disassembly
-│   ├── fm_dev_driver.c       #   Encoding/parsing main logic
-│   ├── fm_dev_driver_raw.h   #   Protocol-layer structs and conversions (internal)
-│   └── fm_dev_msg.h          #   Message layer (internal)
-├── test/test_fm_dev_driver.cpp  # Complete usage examples for the API (highly recommended)
+│   ├── fm_crc.c/.h       #   CRC checksum
+│   ├── fm_frame.c/.h     #   Frame assembly/disassembly
+│   ├── fm_driver.c       #   Encoding/parsing main logic
+│   ├── fm_driver_raw.h   #   Protocol-layer structs and conversions (internal)
+│   └── fm_msg.h          #   Message layer (internal)
+├── test/test_fm_driver.cpp  # Complete usage examples for the API (highly recommended)
 ├── app/                      # ROS nodes and serial implementation (used for ROS integration)
 ├── msg/                      # ROS message definitions
 ├── launch/                   # ROS launch files
@@ -34,14 +34,14 @@ The pure C driver does just two things: **encode** the messages you want to send
 
 Add the following to your build:
 
-- Source files: `src/fm_dev_crc.c`, `src/fm_dev_frame.c`, `src/fm_dev_driver.c`
+- Source files: `src/fm_crc.c`, `src/fm_frame.c`, `src/fm_driver.c`
 - Header directory: `include/`
 
-In your application code you only need `#include "fm_dev_driver.h"`. The driver targets C11, performs no dynamic memory allocation, and has no third-party dependencies, making it suitable for resource-constrained MCUs.
+In your application code you only need `#include "fm_driver.h"`. The driver targets C11, performs no dynamic memory allocation, and has no third-party dependencies, making it suitable for resource-constrained MCUs.
 
 ### API Overview
 
-All APIs and message structs are defined in [include/fm_dev_driver.h](include/fm_dev_driver.h). Communication has two directions, but you only need to care about the APIs for the user->dev direction:
+All APIs and message structs are defined in [include/fm_driver.h](include/fm_driver.h). Communication has two directions, but you only need to care about the APIs for the user->dev direction:
 
 - **Encoding**: `fm_prepare_msg_to_dev()` packs one message (a `FMData*` struct) into a frame and returns the frame length. You then send the frame to the device over the serial port.
   - To pack multiple messages into a single frame, use the step-by-step API: `fm_prepare_msg_to_dev_begin()` → `fm_prepare_msg_to_dev_try_append()` (callable multiple times) → `fm_prepare_msg_to_dev_end()`.
@@ -52,7 +52,7 @@ All APIs and message structs are defined in [include/fm_dev_driver.h](include/fm
 ### Minimal Example
 
 ```c
-#include "fm_dev_driver.h"
+#include "fm_driver.h"
 #include <stdio.h>
 
 // —— Receiving: invoked once per parsed message reported by the device ——
@@ -103,7 +103,7 @@ void app_send_find(void) {
 
 ### More Usage
 
-The test file [test/test_fm_dev_driver.cpp](test/test_fm_dev_driver.cpp) covers encode/parse round-trip cases for **every message** in both directions. It is the most complete and authoritative API usage reference — refer to it directly during integration.
+The test file [test/test_fm_driver.cpp](test/test_fm_driver.cpp) covers encode/parse round-trip cases for **every message** in both directions. It is the most complete and authoritative API usage reference — refer to it directly during integration.
 
 ## ROS1 Integration
 
@@ -116,7 +116,7 @@ The ROS driver package wraps serial I/O and topic conversion on top of the pure 
 ```bash
 mkdir -p ~/catkin_ws/src
 cd ~/catkin_ws/src
-git clone <repository-url> fm_dev_driver
+git clone <repository-url> fm_driver
 ```
 
 ### Build
@@ -134,7 +134,7 @@ source devel/setup.bash
 Connect the wired AOA device to your computer via serial, confirm the port (e.g. `/dev/ttyUSB0`), then launch:
 
 ```bash
-roslaunch fm_dev_driver msg.launch port:=/dev/ttyUSB0 baudrate:=921600
+roslaunch fm_driver msg.launch port:=/dev/ttyUSB0 baudrate:=921600
 ```
 
 - `port`: serial device path, default `/dev/ttyUSB0`
@@ -158,7 +158,7 @@ rostopic echo /ros_converter/result # view positioning results
 ```bash
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
-git clone <repository-url> fm_dev_driver
+git clone <repository-url> fm_driver
 ```
 
 ### Build
@@ -172,7 +172,7 @@ source install/setup.bash
 ### Run
 
 ```bash
-ros2 launch fm_dev_driver msg.py port:=/dev/ttyACM0 baudrate:=921600
+ros2 launch fm_driver msg.py port:=/dev/ttyACM0 baudrate:=921600
 ```
 
 - `port`: serial device path, default `/dev/ttyACM0`
@@ -183,7 +183,7 @@ ros2 launch fm_dev_driver msg.py port:=/dev/ttyACM0 baudrate:=921600
 You can also run the node directly without launch:
 
 ```bash
-ros2 run fm_dev_driver ros_converter --ros-args -p port:=/dev/ttyACM0 -p baudrate:=921600
+ros2 run fm_driver ros_converter --ros-args -p port:=/dev/ttyACM0 -p baudrate:=921600
 ```
 
 ### View Data

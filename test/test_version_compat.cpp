@@ -1,11 +1,11 @@
 #include "catch2/catch_all.hpp"
-#include "fm_dev_driver.h"
+#include "fm_driver.h"
 // 白盒测试: 需要构造 payload 大小与"当前版本结构体"不一致的帧，
 // 这只能在内部 wire 层手工拼装(对外接口总是产生正确大小)，故依赖内部头。
-#include "fm_dev_crc.h"
-#include "fm_dev_driver_raw.h"
-#include "fm_dev_frame.h"
-#include "fm_dev_msg.h"
+#include "fm_crc.h"
+#include "fm_driver_raw.h"
+#include "fm_frame.h"
+#include "fm_msg.h"
 #include <cstring>
 #include <vector>
 

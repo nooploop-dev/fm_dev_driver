@@ -1,4 +1,4 @@
-#include "fm_dev_crc.h"
+#include "fm_crc.h"
 #include <string.h>
 
 // 对应 https://www.lddgo.net/encrypt/crc 中的CRC-8 CRC-16-MODBUS

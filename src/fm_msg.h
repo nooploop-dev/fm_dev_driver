@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#include "fm_dev_driver.h" // fm_msg_id_t
+#include "fm_driver.h" // fm_msg_id_t
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>

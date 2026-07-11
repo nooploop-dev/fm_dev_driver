@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-set(PKG_NAME fm_dev_driver)
+set(PKG_NAME fm_driver)
 
 project(${PKG_NAME})
 
@@ -8,7 +8,7 @@ option(FM_BUILD_READER "build reader" ON)
 option(FM_BUILD_WRITER "build writer" ON)
 option(FM_BUILD_ROS1 "build ROS1 converter" OFF)
 option(FM_BUILD_ROS2 "build ROS2 converter" OFF)
-option(FM_BUILD_TEST "build test" OFF)
+option(FM_BUILD_TEST "build test" ON)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -38,15 +38,15 @@ set(LIB_DEV_DRIVER lib_${PKG_NAME})
 add_library(
   ${LIB_DEV_DRIVER} STATIC
   # 对外公共头
-  include/fm_dev_driver.h
+  include/fm_driver.h
   # 内部实现
-  src/fm_dev_crc.c
-  src/fm_dev_crc.h
-  src/fm_dev_msg.h
-  src/fm_dev_frame.c
-  src/fm_dev_frame.h
-  src/fm_dev_driver_raw.h
-  src/fm_dev_driver.c)
+  src/fm_crc.c
+  src/fm_crc.h
+  src/fm_msg.h
+  src/fm_frame.c
+  src/fm_frame.h
+  src/fm_driver_raw.h
+  src/fm_driver.c)
 target_include_directories(
   ${LIB_DEV_DRIVER}
   PUBLIC include
