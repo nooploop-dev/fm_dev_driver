@@ -1,6 +1,6 @@
 # AOA DEVICE DRIVER
 
-[简体中文](./readme.md)  | English
+[简体中文](./readme.md) | English
 
 This repository contains the driver code for the Nooploop [AOA Follow Me](https://www.nooploop.com/en/follow-me/) product. It provides:
 
@@ -19,7 +19,11 @@ fm_driver/
 │   ├── fm_driver_raw.h   #   Protocol-layer structs and conversions (internal)
 │   └── fm_msg.h          #   Message layer (internal)
 ├── test/test_fm_driver.cpp  # Complete usage examples for the API (highly recommended)
-├── app/                      # ROS nodes and serial implementation (used for ROS integration)
+├── app/                      # Host applications and integration examples
+│   ├── reader/               # Example: receive and parse device data over serial
+│   ├── writer/               # Example: encode and send data to the device over serial
+│   ├── ros1_converter/       # ROS1 topic/device-data conversion node
+│   └── ros2_converter/       # ROS2 topic/device-data conversion node
 ├── msg/                      # ROS message definitions
 ├── launch/                   # ROS launch files
 ├── package.xml               # ROS package manifest
@@ -39,9 +43,11 @@ Add the following to your build:
 
 In your application code you only need `#include "fm_driver.h"`. The driver targets C11, performs no dynamic memory allocation, and has no third-party dependencies, making it suitable for resource-constrained MCUs.
 
+> A pure C project only needs to integrate `include/` and `src/`; it does not depend on `app/`. For examples of connecting the driver APIs to actual data I/O, see [`app/reader/`](app/reader/) for parsing device data and [`app/writer/`](app/writer/) for sending data to the device. The example applications use C++ for serial I/O and logging, but call exactly the same encoding and parsing APIs as a pure C project.
+
 ### API Overview
 
-All APIs and message structs are defined in [include/fm_driver.h](include/fm_driver.h). Communication has two directions, but you only need to care about the APIs for the user->dev direction:
+All APIs and message structs are defined in [include/fm_driver.h](include/fm_driver.h). Communication has two directions: "device → user" and "user → device":
 
 - **Encoding**: `fm_prepare_msg_to_dev()` packs one message (a `FMData*` struct) into a frame and returns the frame length. You then send the frame to the device over the serial port.
   - To pack multiple messages into a single frame, use the step-by-step API: `fm_prepare_msg_to_dev_begin()` → `fm_prepare_msg_to_dev_try_append()` (callable multiple times) → `fm_prepare_msg_to_dev_end()`.
@@ -229,14 +235,6 @@ Group changes only take effect after logging out and back in (or rebooting). Onc
 groups | grep dialout
 ```
 
-### Temporary Workaround (lost after reboot or replug)
-
-For a one-off debugging session, you can open up read/write permission on the device directly:
-
-```bash
-sudo chmod a+rw /dev/ttyUSB0
-```
-
 ## Topics (common to ROS1 / ROS2)
 
 The node name is `ros_converter`, and all topics are namespaced under the node name (i.e. `/ros_converter/<topic>`).
@@ -274,7 +272,9 @@ Message field definitions are in the [msg/](msg/) directory.
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `FM_BUILD_TEST` | OFF | Build the pure C driver unit tests (fetches Catch2 automatically) |
+| `FM_BUILD_READER` | ON | Build the serial receive and device-data parsing example |
+| `FM_BUILD_WRITER` | ON | Build the encoding and serial send example |
+| `FM_BUILD_TEST` | ON | Build the pure C driver unit tests (fetches Catch2 automatically) |
 | `FM_BUILD_ROS1` | OFF | Build the ROS1 driver package |
 | `FM_BUILD_ROS2` | OFF | Build the ROS2 driver package |
 

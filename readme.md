@@ -19,7 +19,11 @@ fm_driver/
 │   ├── fm_driver_raw.h   #   协议层结构体与转换(内部)
 │   └── fm_msg.h          #   消息层(内部)
 ├── test/test_fm_driver.cpp  # 接口用法的完整示例(强烈建议参考)
-├── app/                      # ROS 节点与串口实现(ROS集成时使用)
+├── app/                      # 上位机应用与集成示例
+│   ├── reader/               # 示例：从串口接收并解析设备数据
+│   ├── writer/               # 示例：组包并通过串口向设备发送数据
+│   ├── ros1_converter/       # ROS1 话题与设备数据转换节点
+│   └── ros2_converter/       # ROS2 话题与设备数据转换节点
 ├── msg/                      # ROS 消息定义
 ├── launch/                   # ROS launch 文件
 ├── package.xml               # ROS 包描述
@@ -39,9 +43,11 @@ fm_driver/
 
 业务代码中只需 `#include "fm_driver.h"`。驱动遵循 C11，无动态内存分配、无第三方依赖，适合资源受限的 MCU。
 
+> 纯 C 工程只需集成 `include/` 和 `src/`，不需要依赖 `app/`。如果需要了解如何把驱动接口接入实际的数据收发流程，可参考应用示例：解析设备数据参考 [`app/reader/`](app/reader/)，向设备发送数据参考 [`app/writer/`](app/writer/)。示例应用使用 C++ 实现串口和日志，但其中调用的组包、解析接口与纯 C 工程完全相同。
+
 ### 接口概览
 
-所有接口与消息结构体都定义在 [include/fm_driver.h](include/fm_driver.h) 中。通信分两个方向，但用户只需要关注user->dev方向的相关接口：
+所有接口与消息结构体都定义在 [include/fm_driver.h](include/fm_driver.h) 中。通信分为“设备 → 用户”和“用户 → 设备”两个方向：
 
 - **组包**：`fm_prepare_msg_to_dev()` 将一个消息（`FMData*` 结构体）封装为一帧，返回帧长度，随后直接将该帧通过串口发给设备。
   - 如需在一帧里打包多条消息，使用分步接口：`fm_prepare_msg_to_dev_begin()` → `fm_prepare_msg_to_dev_try_append()`（可多次）→ `fm_prepare_msg_to_dev_end()`。
@@ -265,7 +271,9 @@ groups | grep dialout
 
 | 选项 | 默认 | 说明 |
 | --- | --- | --- |
-| `FM_BUILD_TEST` | OFF | 构建纯 C 驱动单元测试（自动拉取 Catch2） |
+| `FM_BUILD_READER` | ON | 构建串口接收与设备数据解析示例 |
+| `FM_BUILD_WRITER` | ON | 构建组包与串口发送示例 |
+| `FM_BUILD_TEST` | ON | 构建纯 C 驱动单元测试（自动拉取 Catch2） |
 | `FM_BUILD_ROS1` | OFF | 构建 ROS1 驱动包 |
 | `FM_BUILD_ROS2` | OFF | 构建 ROS2 驱动包 |
 
