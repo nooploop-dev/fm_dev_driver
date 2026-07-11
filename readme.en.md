@@ -45,7 +45,7 @@ All APIs and message structs are defined in [include/fm_dev_driver.h](include/fm
 
 - **Encoding**: `fm_prepare_msg_to_dev()` packs one message (a `FMData*` struct) into a frame and returns the frame length. You then send the frame to the device over the serial port.
   - To pack multiple messages into a single frame, use the step-by-step API: `fm_prepare_msg_to_dev_begin()` → `fm_prepare_msg_to_dev_try_append()` (callable multiple times) → `fm_prepare_msg_to_dev_end()`.
-- **Parsing**: register a callback with `FMParserFromDev` + `fm_parser_from_dev_init()`. Feed every chunk of received serial data to `fm_parser_from_dev_handle_data()`; it automatically deframes and parses, invoking the callback once per parsed message. Inside the callback, cast to the matching `FMData*` struct based on `msg_id`.
+- **Parsing**: register callbacks with `FMParserFromDev` + `fm_parser_from_dev_init()`. Feed every chunk of received serial data to `fm_parser_from_dev_handle_data()`; it automatically deframes and parses. `on_frame_begin` is invoked once at the start of each frame (providing the frame header info: role/uid/frame count), `on_frame_msg` once per parsed message inside the frame (cast to the matching `FMData*` struct based on `msg_id`), and `on_frame_end` once after the whole frame is processed; pass `NULL` for callbacks you don't need.
 
 > The one-to-one mapping between message IDs (`FM_MSG_*`) and their structs (`FMData*`), as well as the meaning of each field, is documented in the header comments.
 
@@ -55,11 +55,12 @@ All APIs and message structs are defined in [include/fm_dev_driver.h](include/fm
 #include "fm_dev_driver.h"
 #include <stdio.h>
 
-// —— Receiving: invoked when a message reported by the device is parsed ——
-static void on_msg_from_dev(fm_connect_type_e connect_type, fm_role_e role,
-                            const uint8_t *wired_uid, fm_frame_cnt_t frame_cnt,
-                            fm_msg_id_t msg_id, const void *msg_payload,
-                            int msg_payload_size) {
+// —— Receiving: invoked once per parsed message reported by the device ——
+// wired=true: the message comes from the wired (directly connected) device;
+// wired=false: it comes from the device on the wireless side
+static void on_frame_msg_from_dev(bool wired, fm_msg_id_t msg_id,
+                                  const void *msg_payload,
+                                  int msg_payload_size) {
   switch (msg_id) {
   case FM_MSG_SPHERICAL_RESULT: { // spherical positioning result
     const FMDataSphericalResult *r =
@@ -76,7 +77,9 @@ static void on_msg_from_dev(fm_connect_type_e connect_type, fm_role_e role,
 static FMParserFromDev g_parser;
 
 void app_init(void) {
-  fm_parser_from_dev_init(&g_parser, on_msg_from_dev);
+  // Register on_frame_begin/on_frame_end if you need the frame header info
+  // (role/uid/frame count)
+  fm_parser_from_dev_init(&g_parser, NULL, on_frame_msg_from_dev, NULL);
 }
 
 // Call this whenever the serial ISR/poll receives data

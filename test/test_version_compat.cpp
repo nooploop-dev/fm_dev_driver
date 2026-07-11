@@ -17,9 +17,9 @@ struct Captured {
 };
 std::vector<Captured> g_msgs;
 
-void on_from_user(fm_frame_cnt_t cnt, fm_msg_id_t id, const void *payload,
-                  int size) {
-  (void)cnt;
+void on_from_user_msg(bool wired, fm_msg_id_t id, const void *payload,
+                      int size) {
+  (void)wired;
   Captured c{};
   c.id = id;
   const uint8_t *p = static_cast<const uint8_t *>(payload);
@@ -50,7 +50,7 @@ std::vector<uint8_t> craft_frame(fm_frame_cnt_t cnt, fm_msg_id_t id,
 TEST_CASE("msg payload version compatibility") {
   g_msgs.clear();
   FMParserFromUser parser;
-  fm_parser_from_user_init(&parser, on_from_user);
+  fm_parser_from_user_init(&parser, nullptr, on_from_user_msg, nullptr);
 
   // 取一个含定长整数末尾字段的协议结构体，便于观察末尾字段
   FMRawDataParam raw{};

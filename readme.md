@@ -45,7 +45,7 @@ fm_dev_driver/
 
 - **组包**：`fm_prepare_msg_to_dev()` 将一个消息（`FMData*` 结构体）封装为一帧，返回帧长度，随后直接将该帧通过串口发给设备。
   - 如需在一帧里打包多条消息，使用分步接口：`fm_prepare_msg_to_dev_begin()` → `fm_prepare_msg_to_dev_try_append()`（可多次）→ `fm_prepare_msg_to_dev_end()`。
-- **解析**：用 `FMParserFromDev` + `fm_parser_from_dev_init()` 注册回调，串口每收到一段数据就喂给 `fm_parser_from_dev_handle_data()`；内部自动完成拆帧与解析，每解析出一条消息就回调一次，回调里按 `msg_id` 取对应的 `FMData*` 结构体。
+- **解析**：用 `FMParserFromDev` + `fm_parser_from_dev_init()` 注册回调，串口每收到一段数据就喂给 `fm_parser_from_dev_handle_data()`；内部自动完成拆帧与解析。每帧开始时回调 `on_frame_begin`（提供角色/uid/帧计数等帧头信息），帧内每解析出一条消息回调一次 `on_frame_msg`（回调里按 `msg_id` 取对应的 `FMData*` 结构体），处理完一帧后回调 `on_frame_end`；不需要的回调可传 `NULL`。
 
 > 消息 ID（`FM_MSG_*`）与对应结构体（`FMData*`）的一一映射、各字段含义，均见头文件注释。
 
@@ -55,11 +55,11 @@ fm_dev_driver/
 #include "fm_dev_driver.h"
 #include <stdio.h>
 
-// —— 接收：解析设备上报的消息时被回调 ——
-static void on_msg_from_dev(fm_connect_type_e connect_type, fm_role_e role,
-                            const uint8_t *wired_uid, fm_frame_cnt_t frame_cnt,
-                            fm_msg_id_t msg_id, const void *msg_payload,
-                            int msg_payload_size) {
+// —— 接收：每解析出一条设备上报的消息时被回调 ——
+// wired 为 true 表示消息来自有线直连的设备，false 表示来自无线侧的设备
+static void on_frame_msg_from_dev(bool wired, fm_msg_id_t msg_id,
+                                  const void *msg_payload,
+                                  int msg_payload_size) {
   switch (msg_id) {
   case FM_MSG_SPHERICAL_RESULT: { // 球坐标定位结果
     const FMDataSphericalResult *r =
@@ -76,7 +76,8 @@ static void on_msg_from_dev(fm_connect_type_e connect_type, fm_role_e role,
 static FMParserFromDev g_parser;
 
 void app_init(void) {
-  fm_parser_from_dev_init(&g_parser, on_msg_from_dev);
+  // 如需帧头信息(角色/uid/帧计数)，注册 on_frame_begin/on_frame_end 回调
+  fm_parser_from_dev_init(&g_parser, NULL, on_frame_msg_from_dev, NULL);
 }
 
 // 串口中断/轮询收到数据后调用

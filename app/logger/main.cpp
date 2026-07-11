@@ -43,7 +43,8 @@ int main(int argc, char **argv) {
 
   spdlog::info("Listening on {} at {} baud", port, baud_rate);
   FMParserFromDev parser;
-  fm_parser_from_dev_init(&parser, data_handle::on_msg);
+  fm_parser_from_dev_init(&parser, data_handle::on_frame_begin,
+                          data_handle::on_frame_msg, data_handle::on_frame_end);
   main_common_init(port, baud_rate, &parser);
   spdlog::default_logger()->flush();
   return 0;

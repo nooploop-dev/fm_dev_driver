@@ -4,13 +4,14 @@
 #include <cstring>
 
 namespace {
-// 单例指针，供无arg的on_msg回调路由
+// 单例指针，供无arg的on_frame_msg回调路由
 Ros2DataHandle *s_self = nullptr;
 } // namespace
 
 Ros2DataHandle::Ros2DataHandle(const rclcpp::Node::SharedPtr &node)
     : node_(node) {
-  fm_parser_from_dev_init(&parser_, &Ros2DataHandle::on_msg);
+  fm_parser_from_dev_init(&parser_, nullptr, &Ros2DataHandle::on_frame_msg,
+                          nullptr);
   s_self = this;
 
   // 设备 -> 用户(^)
@@ -248,14 +249,10 @@ void Ros2DataHandle::on_user_data_to_device(
   main_common_send_msg(FM_WIRED, FM_MSG_DATA_USER_TO_USER, &data, sizeof(data));
 }
 
-void Ros2DataHandle::on_msg(fm_connect_type_e connect_type, fm_role_e role,
-                            const uint8_t *uid, fm_frame_cnt_t cnt,
-                            fm_msg_id_t msg_id, const void *msg_payload,
-                            int msg_payload_size) {
-  (void)connect_type;
-  (void)role;
-  (void)uid;
-  (void)cnt;
+void Ros2DataHandle::on_frame_msg(bool wired, fm_msg_id_t msg_id,
+                                  const void *msg_payload,
+                                  int msg_payload_size) {
+  (void)wired;
   (void)msg_payload_size;
   if (!s_self) {
     return;

@@ -106,9 +106,9 @@ static int fm_dev_to_user_encode(fm_msg_id_t msg_id, const void *app,
     fm_msg_copy_payload(&p, sizeof(p), msg->payload, msg->payload_size);       \
     APPTYPE a;                                                                 \
     FROM(&p, &a);                                                              \
-    if (parser->on_msg) {                                                      \
-      parser->on_msg(parser->connect_type, parser->role, parser->wired_uid,    \
-                     parser->frame_cnt, msg->id, &a, (int)sizeof(a));          \
+    if (parser->on_frame_msg) {                                                \
+      parser->on_frame_msg(parser->role == parser->wired_role, msg->id, &a,    \
+                           (int)sizeof(a));                                    \
     }                                                                          \
   } while (0)
 
@@ -123,21 +123,20 @@ static void fm_parser_from_dev_dev_to_user(FMParserFromDev *parser,
   parser->role = (parser->wired_role == FM_ANCHOR) ? FM_TAG : FM_ANCHOR;
   fm_msg_parser_handle_data(&fm_dev_to_user_decode, parser, ud->payload,
                             ud->payload_size);
+  // 恢复瞬时状态，同帧后续消息仍属于有线直连节点
   parser->connect_type = FM_WIRED;
+  parser->role = parser->wired_role;
 }
 
 static void fm_parser_from_dev_user_to_user(FMParserFromDev *parser,
                                             const FMData *msg) {
-  parser->connect_type = FM_WIRED;
-  parser->role = (parser->wired_role == FM_ANCHOR) ? FM_TAG : FM_ANCHOR;
   FMRawDataDataUserToUser ud;
   fm_msg_copy_payload(&ud, sizeof(ud), msg->payload, msg->payload_size);
   FMDataDataUserToUser a;
   fm_data_user_to_user_from_raw(&ud, &a);
-  if (parser->on_msg) {
-    parser->on_msg(parser->connect_type, parser->role, parser->wired_uid,
-                   parser->frame_cnt, FM_MSG_DATA_USER_TO_USER, &a,
-                   (int)sizeof(a));
+  if (parser->on_frame_msg) {
+    // user_to_user 恒为无线对端用户的数据
+    parser->on_frame_msg(false, FM_MSG_DATA_USER_TO_USER, &a, (int)sizeof(a));
   }
 }
 
@@ -208,8 +207,8 @@ static void fm_dev_to_user_decode(void *arg, const FMData *msg) {
     fm_msg_copy_payload(&p, sizeof(p), msg->payload, msg->payload_size);       \
     APPTYPE a;                                                                 \
     FROM(&p, &a);                                                              \
-    if (parser->on_msg) {                                                      \
-      parser->on_msg(parser->frame_cnt, msg->id, &a, (int)sizeof(a));          \
+    if (parser->on_frame_msg) {                                                \
+      parser->on_frame_msg(parser->wired, msg->id, &a, (int)sizeof(a));        \
     }                                                                          \
   } while (0)
 
@@ -220,8 +219,11 @@ static void fm_parser_from_user_user_to_dev(FMParserFromUser *parser,
                                             const FMData *msg) {
   const FMRawDataDataUserToDev *ud =
       (const FMRawDataDataUserToDev *)msg->payload;
+  parser->wired = false;
   fm_msg_parser_handle_data(&fm_user_to_dev_decode, parser, ud->payload,
                             ud->payload_size);
+  // 恢复瞬时状态，同帧后续消息仍属于有线直连节点
+  parser->wired = true;
 }
 
 static void fm_parser_from_user_user_to_user(FMParserFromUser *parser,
@@ -230,9 +232,9 @@ static void fm_parser_from_user_user_to_user(FMParserFromUser *parser,
   fm_msg_copy_payload(&ud, sizeof(ud), msg->payload, msg->payload_size);
   FMDataDataUserToUser a;
   fm_data_user_to_user_from_raw(&ud, &a);
-  if (parser->on_msg) {
-    parser->on_msg(parser->frame_cnt, FM_MSG_DATA_USER_TO_USER, &a,
-                   (int)sizeof(a));
+  if (parser->on_frame_msg) {
+    parser->on_frame_msg(parser->wired, FM_MSG_DATA_USER_TO_USER, &a,
+                         (int)sizeof(a));
   }
 }
 
@@ -241,8 +243,8 @@ static void fm_user_to_dev_decode(void *arg, const FMData *msg) {
   switch (msg->id) {
   // 无负载的读取命令
   case FM_MSG_PARAM_READ:
-    if (parser->on_msg) {
-      parser->on_msg(parser->frame_cnt, msg->id, NULL, 0);
+    if (parser->on_frame_msg) {
+      parser->on_frame_msg(parser->wired, msg->id, NULL, 0);
     }
     break;
   case FM_MSG_ECHO:
@@ -291,7 +293,7 @@ static int fm_build_msg_to_dev(fm_connect_type_e connect_type,
   ud.payload_size =
       (uint8_t)fm_msg_write(ud.payload, msg_id, proto, proto_size);
   return fm_msg_write(out, FM_MSG_INTERNAL_DATA_USER_TO_DEV, &ud,
-                      fm_msg_user_data_bytes(&ud));
+                      FM_PAYLOAD_VALID_SIZE(ud));
 }
 
 int fm_prepare_msg_to_dev(fm_connect_type_e connect_type,
@@ -340,45 +342,57 @@ int fm_prepare_msg_to_dev_end(void *frame, int frame_size_max) {
   return fm_frame_user_to_dev_bytes(f);
 }
 
-static int fm_build_msg_to_user(fm_msg_id_t msg_id, const void *msg_payload,
-                                uint8_t *out) {
+static int fm_build_msg_to_user(bool wired, fm_msg_id_t msg_id,
+                                const void *msg_payload, uint8_t *out) {
   uint8_t proto[FM_MSG_PAYLOAD_SIZE_MAX];
   int proto_size = fm_dev_to_user_encode(msg_id, msg_payload, proto);
-  return fm_msg_write(out, msg_id, proto, proto_size);
+  if (wired) {
+    return fm_msg_write(out, msg_id, proto, proto_size);
+  }
+  // 无线侧消息需要先包一层dev_to_user
+  FMRawDataDataDevToUser ud;
+  ud.payload_size =
+      (uint8_t)fm_msg_write(ud.payload, msg_id, proto, proto_size);
+  return fm_msg_write(out, FM_MSG_INTERNAL_DATA_DEV_TO_USER, &ud,
+                      FM_PAYLOAD_VALID_SIZE(ud));
 }
 
-int fm_prepare_msg_to_user(fm_role_e role, const uint8_t *uid,
-                           fm_frame_cnt_t frame_cnt, fm_msg_id_t msg_id,
-                           const void *msg_payload, void *frame,
-                           int frame_size_max) {
-  fm_prepare_msg_to_user_begin(role, uid, frame_cnt, frame, frame_size_max);
-  fm_prepare_msg_to_user_try_append(msg_id, msg_payload, frame, frame_size_max);
+int fm_prepare_msg_to_user(fm_role_e wired_role, const uint8_t *wired_uid,
+                           fm_frame_cnt_t frame_cnt, bool wired,
+                           fm_msg_id_t msg_id, const void *msg_payload,
+                           void *frame, int frame_size_max) {
+  fm_prepare_msg_to_user_begin(wired_role, wired_uid, frame_cnt, frame,
+                               frame_size_max);
+  fm_prepare_msg_to_user_try_append(wired, msg_id, msg_payload, frame,
+                                    frame_size_max);
   return fm_prepare_msg_to_user_end(frame, frame_size_max);
 }
 
-void fm_prepare_msg_to_user_begin(fm_role_e role, const uint8_t *uid,
+void fm_prepare_msg_to_user_begin(fm_role_e wired_role,
+                                  const uint8_t *wired_uid,
                                   fm_frame_cnt_t frame_cnt, void *frame,
                                   int frame_size_max) {
   (void)frame_size_max;
   FMFrameDevToUser *f = (FMFrameDevToUser *)frame;
   f->sof = FM_FRAME_SOF;
   f->sys_type = FM_SYS_TYPE;
-  f->role = (uint8_t)role;
+  f->role = (uint8_t)wired_role;
   f->cnt = frame_cnt;
-  if (uid) {
-    memcpy(f->uid, uid, FM_UID_SIZE);
+  if (wired_uid) {
+    memcpy(f->uid, wired_uid, FM_UID_SIZE);
   } else {
     memset(f->uid, 0, FM_UID_SIZE);
   }
   f->payload_size = 0;
 }
 
-bool fm_prepare_msg_to_user_try_append(int msg_id, const void *msg_payload,
-                                       void *frame, int frame_size_max) {
+bool fm_prepare_msg_to_user_try_append(bool wired, int msg_id,
+                                       const void *msg_payload, void *frame,
+                                       int frame_size_max) {
   FMFrameDevToUser *f = (FMFrameDevToUser *)frame;
   uint8_t msg_buf[FM_FRAME_SIZE_MAX];
   int appended =
-      fm_build_msg_to_user((fm_msg_id_t)msg_id, msg_payload, msg_buf);
+      fm_build_msg_to_user(wired, (fm_msg_id_t)msg_id, msg_payload, msg_buf);
   int new_payload_size = (int)f->payload_size + appended;
   if (new_payload_size > FM_FRAME_DEV_TO_USER_PAYLOAD_SIZE_MAX) {
     return false;
@@ -408,14 +422,25 @@ static void fm_parser_from_dev_on_frame(void *arg, const void *frame,
   parser->role = parser->wired_role;
   parser->frame_cnt = f->cnt;
   memcpy(parser->wired_uid, f->uid, FM_UID_SIZE);
+  if (parser->on_frame_begin) {
+    parser->on_frame_begin(parser->wired_role, parser->wired_uid,
+                           parser->frame_cnt);
+  }
   fm_msg_parser_handle_data(&fm_dev_to_user_decode, parser, f->payload,
                             f->payload_size);
+  if (parser->on_frame_end) {
+    parser->on_frame_end();
+  }
 }
 
 void fm_parser_from_dev_init(FMParserFromDev *parser,
-                             fm_on_msg_from_dev_f on_msg) {
+                             fm_on_frame_begin_from_dev_f on_frame_begin,
+                             fm_on_frame_msg_from_dev_f on_frame_msg,
+                             fm_on_frame_end_from_dev_f on_frame_end) {
   memset(parser, 0, sizeof(*parser));
-  parser->on_msg = on_msg;
+  parser->on_frame_begin = on_frame_begin;
+  parser->on_frame_msg = on_frame_msg;
+  parser->on_frame_end = on_frame_end;
 }
 
 void fm_parser_from_dev_handle_data(FMParserFromDev *parser, const void *data,
@@ -430,15 +455,26 @@ static void fm_parser_from_user_on_frame(void *arg, const void *frame,
   (void)frame_size;
   FMParserFromUser *parser = (FMParserFromUser *)arg;
   const FMFrameUserToDev *f = (const FMFrameUserToDev *)frame;
+  parser->wired = true;
   parser->frame_cnt = f->cnt;
+  if (parser->on_frame_begin) {
+    parser->on_frame_begin(parser->frame_cnt);
+  }
   fm_msg_parser_handle_data(&fm_user_to_dev_decode, parser, f->payload,
                             f->payload_size);
+  if (parser->on_frame_end) {
+    parser->on_frame_end();
+  }
 }
 
 void fm_parser_from_user_init(FMParserFromUser *parser,
-                              fm_on_msg_from_user_f on_msg) {
+                              fm_on_frame_begin_from_user_f on_frame_begin,
+                              fm_on_frame_msg_from_user_f on_frame_msg,
+                              fm_on_frame_end_from_user_f on_frame_end) {
   memset(parser, 0, sizeof(*parser));
-  parser->on_msg = on_msg;
+  parser->on_frame_begin = on_frame_begin;
+  parser->on_frame_msg = on_frame_msg;
+  parser->on_frame_end = on_frame_end;
 }
 
 void fm_parser_from_user_handle_data(FMParserFromUser *parser, const void *data,

@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include "fm_dev_driver.h"
+#include "fm_dev_msg.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -25,6 +26,11 @@ static inline uint16_t fm_clamp_cast_u16(float v) {
   return (uint16_t)v;
 }
 
+// 计算payload形式的数据的字节数
+#define FM_PAYLOAD_VALID_SIZE(data)                                            \
+  (int)((const uint8_t *)&(data).payload - (const uint8_t *)&(data) +          \
+        (data).payload_size)
+
 #pragma pack(push, 1)
 
 typedef struct {
@@ -42,7 +48,7 @@ static inline void fm_data_echo_to_raw(const FMDataEcho *data, void *raw_data,
   memset(raw, 0, sizeof(*raw));
   raw->payload_size = data->payload_size;
   memcpy(raw->payload, data->payload, data->payload_size);
-  *raw_data_size = offsetof(FMRawDataEcho, payload) + raw->payload_size;
+  *raw_data_size = FM_PAYLOAD_VALID_SIZE(*raw);
 }
 
 typedef struct {
@@ -361,9 +367,7 @@ typedef struct {
 typedef FMRawDataUserData FMRawDataDataUserToDev;
 typedef FMRawDataUserData FMRawDataDataDevToUser;
 typedef FMRawDataUserData FMRawDataDataUserToUser;
-static inline int fm_msg_user_data_bytes(const FMRawDataUserData *u) {
-  return (int)(offsetof(FMRawDataUserData, payload) + u->payload_size);
-}
+
 static inline void
 fm_data_user_to_user_from_raw(const FMRawDataDataUserToUser *raw_data,
                               FMDataDataUserToUser *data) {
@@ -377,7 +381,7 @@ static inline void fm_data_user_to_user_to_raw(const FMDataDataUserToUser *data,
   memset(raw, 0, sizeof(*raw));
   raw->payload_size = data->payload_size;
   memcpy(raw->payload, data->payload, data->payload_size);
-  *raw_data_size = fm_msg_user_data_bytes(raw);
+  *raw_data_size = FM_PAYLOAD_VALID_SIZE(*raw);
 }
 
 #pragma pack(pop)

@@ -25,10 +25,9 @@ public:
   FMParserFromDev *parser() { return &parser_; }
 
 private:
-  // 收到设备数据的回调(C接口，无arg，路由到单例)
-  static void on_msg(fm_connect_type_e connect_type, fm_role_e role,
-                     const uint8_t *uid, fm_frame_cnt_t cnt, fm_msg_id_t msg_id,
-                     const void *msg_payload, int msg_payload_size);
+  // 收到设备消息的回调(C接口，无arg，路由到单例)
+  static void on_frame_msg(bool wired, fm_msg_id_t msg_id,
+                           const void *msg_payload, int msg_payload_size);
   // 设备 -> 用户(^)，解析后发布到话题
   void dispatch(const FMDataEcho &data);
   void dispatch(const FMDataHeartbeat &data);
