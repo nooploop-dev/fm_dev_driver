@@ -1,4 +1,5 @@
 #include "reader_data_handle.hpp"
+#include "foxglove_viz.hpp"
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -108,6 +109,7 @@ void on_frame_msg(fm_connect_type_e connect_type, fm_msg_id_t msg_id,
                  header, data->local_time, data->cnt, vec2str(data->pos),
                  vec2str(data->vel), vec2str(data->pos_noise),
                  vec2str(data->vel_noise));
+    foxglove_viz::publish(*data);
     break;
   }
   case FM_MSG_PREV_RESULT: {
@@ -138,6 +140,7 @@ void on_frame_msg(fm_connect_type_e connect_type, fm_msg_id_t msg_id,
                  "azimuth={},elevation={}}}",
                  header, data->local_time, data->cnt, data->dis, data->azimuth,
                  data->elevation);
+    foxglove_viz::publish(*data);
     break;
   }
   case FM_MSG_PREV_SPHERICAL_RESULT: {
@@ -152,6 +155,7 @@ void on_frame_msg(fm_connect_type_e connect_type, fm_msg_id_t msg_id,
     auto data = get_data<FMDataDis>(msg_payload, msg_payload_size);
     spdlog::info("{},MSG_DIS: {{local_time={},cnt={},dis={},rx_rate={}}}",
                  header, data->local_time, data->cnt, data->dis, data->rx_rate);
+    foxglove_viz::publish(*data);
     break;
   }
   default: {

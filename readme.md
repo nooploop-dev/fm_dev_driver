@@ -301,12 +301,44 @@ groups | grep dialout
 
 消息字段定义见 [msg/](msg/) 目录。
 
+## Foxglove 可视化（reader，无需 ROS）
+
+`app/reader/` 在原有日志打印之外，可选地内置一个 Foxglove WebSocket 服务，
+不依赖 ROS，适合在没有 ROS 环境的机器上直接看数据。
+
+开启方式（默认关闭）：
+
+```bash
+cmake -B build -DFM_BUILD_FOXGLOVE=ON
+cmake --build build
+./build/app/reader/reader /dev/ttyUSB0 921600   # 可选第三个参数指定端口，默认 8765
+```
+
+然后在 Foxglove 中选择 **Open connection → Foxglove WebSocket**，
+地址填 `ws://<设备IP>:8765` 即可。日志打印保持原样，两者同时输出。
+
+发布的话题：
+
+| 话题 | 类型 | 用途 |
+| --- | --- | --- |
+| `/result_pose` | `foxglove.PoseInFrame` | 定位点，3D 面板显示 |
+| `/result_scene` | `foxglove.SceneUpdate` | 不确定性球（直径 2σ）+ 速度矢量线段 |
+| `/tf` | `foxglove.FrameTransform` | `world` → `fm_anchor_link`，3D 面板的坐标系 |
+| `/result` | JSON | 位置/速度/噪声，供 Plot 面板绘制曲线 |
+| `/spherical_result` | JSON | 距离/方位角/俯仰角，供 Plot 面板绘制曲线 |
+| `/dis` | JSON | 测距结果，供 Plot 面板绘制曲线 |
+
+> 开启后构建会自动下载 Foxglove SDK 官方预编译包（约 30MB，含 Linux x64/arm64、
+> Windows、macOS），无需 Rust 工具链。未开启时 reader 不链接任何 Foxglove 代码，
+> 行为与集成前完全一致。
+
 ## 构建选项（CMake）
 
 | 选项 | 默认 | 说明 |
 | --- | --- | --- |
 | `FM_BUILD_READER` | ON | 构建串口接收与设备数据解析示例 |
 | `FM_BUILD_WRITER` | ON | 构建组包与串口发送示例 |
+| `FM_BUILD_FOXGLOVE` | ON | 为 reader 启用 Foxglove 可视化（自动拉取 Foxglove SDK 预编译包） |
 | `FM_BUILD_TEST` | ON | 构建纯 C 驱动单元测试（自动拉取 Catch2） |
 | `FM_BUILD_ROS1` | OFF | 构建 ROS1 驱动包 |
 | `FM_BUILD_ROS2` | OFF | 构建 ROS2 驱动包 |
