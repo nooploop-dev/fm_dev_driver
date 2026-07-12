@@ -5,11 +5,33 @@ set(PKG_NAME fm_driver)
 project(${PKG_NAME})
 
 option(FM_BUILD_READER "build reader" ON)
-option(FM_BUILD_FOXGLOVE "build reader with foxglove visualization" ON)
 option(FM_BUILD_WRITER "build writer" ON)
 option(FM_BUILD_ROS1 "build ROS1 converter" OFF)
 option(FM_BUILD_ROS2 "build ROS2 converter" OFF)
 option(FM_BUILD_TEST "build test" ON)
+
+# 未显式选择ROS版本时，尝试根据环境变量自动检测
+# (需在FM_BUILD_FOXGLOVE之前完成，其默认值取决于是否为ROS构建)
+if(NOT FM_BUILD_ROS1 AND NOT FM_BUILD_ROS2)
+  if(DEFINED ENV{ROS_VERSION})
+    if("$ENV{ROS_VERSION}" STREQUAL "1")
+      set(FM_BUILD_ROS1 ON)
+    elseif("$ENV{ROS_VERSION}" STREQUAL "2")
+      set(FM_BUILD_ROS2 ON)
+    endif()
+  endif()
+endif()
+
+# ROS构建默认不启用Foxglove：ROS用户通常只需要ROS节点，而启用会自动下载
+# 数十MB的Foxglove SDK，离线环境/CI会因此构建失败。
+# 非ROS构建(独立的reader)则默认启用，开箱即可可视化。两者均可显式覆盖。
+if(FM_BUILD_ROS1 OR FM_BUILD_ROS2)
+  set(FM_FOXGLOVE_DEFAULT OFF)
+else()
+  set(FM_FOXGLOVE_DEFAULT ON)
+endif()
+option(FM_BUILD_FOXGLOVE "build reader with foxglove visualization"
+       ${FM_FOXGLOVE_DEFAULT})
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -59,17 +81,6 @@ if(FM_BUILD_TEST)
   FetchContent_MakeAvailable(Catch2)
   enable_testing()
   add_subdirectory(test)
-endif()
-
-# 未显式选择ROS版本时，尝试根据环境变量自动检测
-if(NOT FM_BUILD_ROS1 AND NOT FM_BUILD_ROS2)
-  if(DEFINED ENV{ROS_VERSION})
-    if("$ENV{ROS_VERSION}" STREQUAL "1")
-      set(FM_BUILD_ROS1 ON)
-    elseif("$ENV{ROS_VERSION}" STREQUAL "2")
-      set(FM_BUILD_ROS2 ON)
-    endif()
-  endif()
 endif()
 
 if(FM_BUILD_ROS1)

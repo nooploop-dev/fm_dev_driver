@@ -310,10 +310,10 @@ On top of its existing log output, `app/reader/` can optionally host a Foxglove
 WebSocket server. It does not depend on ROS, which makes it handy for inspecting
 data on machines without a ROS installation.
 
-Enable it (off by default):
+**It is on by default in non-ROS builds**, so just build and run:
 
 ```bash
-cmake -B build -DFM_BUILD_FOXGLOVE=ON
+cmake -B build
 cmake --build build
 ./build/app/reader/reader /dev/ttyUSB0 921600   # optional 3rd arg sets the port, default 8765
 ```
@@ -332,18 +332,13 @@ Published topics:
 | `/spherical_result` | JSON | Distance/azimuth/elevation, for the Plot panel |
 | `/dis` | JSON | Ranging result, for the Plot panel |
 
-> When enabled, the build downloads the official prebuilt Foxglove SDK (~30 MB;
-> Linux x64/arm64, Windows and macOS are all covered), so no Rust toolchain is
-> needed. When disabled, the reader links no Foxglove code at all and behaves
-> exactly as before.
-
 ## Build Options (CMake)
 
 | Option | Default | Description |
 | --- | --- | --- |
 | `FM_BUILD_READER` | ON | Build the serial receive and device-data parsing example |
 | `FM_BUILD_WRITER` | ON | Build the encoding and serial send example |
-| `FM_BUILD_FOXGLOVE` | ON | Enable Foxglove visualization in the reader (fetches the prebuilt Foxglove SDK automatically) |
+| `FM_BUILD_FOXGLOVE` | ON for non-ROS / OFF for ROS builds | Enable Foxglove visualization in the reader (fetches the prebuilt Foxglove SDK automatically). Off by default in ROS builds to avoid pulling in the SDK download; can be overridden explicitly |
 | `FM_BUILD_TEST` | ON | Build the pure C driver unit tests (fetches Catch2 automatically) |
 | `FM_BUILD_ROS1` | OFF | Build the ROS1 driver package |
 | `FM_BUILD_ROS2` | OFF | Build the ROS2 driver package |
