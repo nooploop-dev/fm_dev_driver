@@ -122,7 +122,7 @@ typedef struct {
   uint32_t uptime;
 } FMDataHeartbeat;
 
-// 定位结果，vel单位cm/s，noise单位cm
+// 定位结果
 typedef struct {
   fm_local_time_t local_time; // us
   uint8_t cnt;

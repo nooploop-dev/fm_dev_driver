@@ -14,6 +14,7 @@
 #include <fm_driver/Restart.h>
 #include <fm_driver/Result.h>
 #include <fm_driver/SphericalResult.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <ros/ros.h>
 #include <std_msgs/Empty.h>
 
@@ -51,11 +52,13 @@ private:
 
   FMParserFromDev parser_;
   ros::NodeHandle *nh_;
+  std::string frame_id_;
 
   ros::Publisher echo_from_device_pub_;
   ros::Publisher heartbeat_pub_;
   ros::Publisher param_pub_;
   ros::Publisher result_pub_;
+  ros::Publisher result_pose_pub_;
   ros::Publisher prev_result_pub_;
   ros::Publisher user_data_from_device_pub_;
   ros::Publisher spherical_result_pub_;

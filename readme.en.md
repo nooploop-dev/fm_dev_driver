@@ -26,6 +26,7 @@ fm_driver/
 │   └── ros2_converter/       # ROS2 topic/device-data conversion node
 ├── msg/                      # ROS message definitions
 ├── launch/                   # ROS launch files
+├── rviz/                     # rviz display configs (one each for ROS1/ROS2)
 ├── package.xml               # ROS package manifest
 └── CMakeLists.txt
 ```
@@ -145,8 +146,25 @@ roslaunch fm_driver msg.launch port:=/dev/ttyUSB0 baudrate:=921600
 
 - `port`: serial device path, default `/dev/ttyUSB0`
 - `baudrate`: baud rate, default `921600`
+- `frame_id`: frame the positioning result is expressed in, written to `header.frame_id`, default `fm_anchor_link`
 
 > If you get a serial "Permission denied" error at startup, see [Serial Port Permissions (Linux)](#serial-port-permissions-linux) below.
+
+### Visualization (rviz)
+
+`rviz.launch` starts the driver, a static TF and rviz together, so the positioning
+result is visible out of the box:
+
+```bash
+roslaunch fm_driver rviz.launch port:=/dev/ttyUSB0
+```
+
+In addition to the arguments above it accepts:
+
+- `parent_frame`: parent frame of the anchor frame, default `map`
+- `anchor_pose`: anchor pose within `parent_frame` as `x y z yaw pitch roll`, default `0 0 0 0 0 0`
+- `static_tf`: whether to publish the `parent_frame` → `frame_id` static TF, default `true`.
+  Set to `false` if that TF is already published elsewhere (e.g. by your robot URDF) to avoid conflicts
 
 ### View Data
 
@@ -183,6 +201,7 @@ ros2 launch fm_driver msg.py port:=/dev/ttyACM0 baudrate:=921600
 
 - `port`: serial device path, default `/dev/ttyACM0`
 - `baudrate`: baud rate, default `921600`
+- `frame_id`: frame the positioning result is expressed in, written to `header.frame_id`, default `fm_anchor_link`
 
 > If you get a serial "Permission denied" error at startup, see [Serial Port Permissions (Linux)](#serial-port-permissions-linux) below.
 
@@ -191,6 +210,22 @@ You can also run the node directly without launch:
 ```bash
 ros2 run fm_driver ros_converter --ros-args -p port:=/dev/ttyACM0 -p baudrate:=921600
 ```
+
+### Visualization (rviz2)
+
+`rviz.py` starts the driver, a static TF and rviz2 together, so the positioning
+result is visible out of the box:
+
+```bash
+ros2 launch fm_driver rviz.py port:=/dev/ttyACM0
+```
+
+In addition to the arguments above it accepts:
+
+- `parent_frame`: parent frame of the anchor frame, default `map`
+- `x` / `y` / `z` / `yaw` / `pitch` / `roll`: anchor pose within `parent_frame`, all default `0`
+- `static_tf`: whether to publish the `parent_frame` → `frame_id` static TF, default `true`.
+  Set to `false` if that TF is already published elsewhere (e.g. by your robot URDF) to avoid conflicts
 
 ### View Data
 
@@ -244,6 +279,7 @@ The node name is `ros_converter`, and all topics are namespaced under the node n
 | Topic | Message Type | Description |
 | --- | --- | --- |
 | `~/result` | `Result` | Positioning result (position/velocity/noise) |
+| `~/result_pose` | `geometry_msgs/PoseWithCovarianceStamped` | The same positioning result as a standard message, for direct display in rviz |
 | `~/prev_result` | `PrevResult` | Previous positioning result (TAG) |
 | `~/spherical_result` | `SphericalResult` | Spherical positioning result (distance/azimuth/elevation) |
 | `~/prev_spherical_result` | `PrevSphericalResult` | Previous spherical result (TAG) |

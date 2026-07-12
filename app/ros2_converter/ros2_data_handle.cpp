@@ -14,6 +14,10 @@ Ros2DataHandle::Ros2DataHandle(const rclcpp::Node::SharedPtr &node)
                           nullptr);
   s_self = this;
 
+  node_->declare_parameter<std::string>("frame_id", "fm_anchor_link");
+  frame_id_ = node_->get_parameter("frame_id").as_string();
+  RCLCPP_INFO(node_->get_logger(), "Frame id: %s", frame_id_.c_str());
+
   // 设备 -> 用户(^)
   echo_from_device_pub_ =
       node_->create_publisher<fm_driver::msg::Echo>("~/echo_from_device", 50);
@@ -21,6 +25,9 @@ Ros2DataHandle::Ros2DataHandle(const rclcpp::Node::SharedPtr &node)
       node_->create_publisher<fm_driver::msg::Heartbeat>("~/heartbeat", 50);
   param_pub_ = node_->create_publisher<fm_driver::msg::Param>("~/param", 50);
   result_pub_ = node_->create_publisher<fm_driver::msg::Result>("~/result", 50);
+  result_pose_pub_ =
+      node_->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+          "~/result_pose", 50);
   prev_result_pub_ =
       node_->create_publisher<fm_driver::msg::PrevResult>("~/prev_result", 50);
   user_data_from_device_pub_ =
@@ -120,16 +127,37 @@ void Ros2DataHandle::dispatch(const FMDataParam &data) {
 }
 
 void Ros2DataHandle::dispatch(const FMDataResult &data) {
-  fm_driver::msg::Result msg;
-  msg.local_time = data.local_time;
-  msg.cnt = data.cnt;
-  for (size_t i = 0; i < 3; i++) {
-    msg.pos[i] = data.pos[i];
-    msg.vel[i] = data.vel[i];
-    msg.pos_noise[i] = data.pos_noise[i];
-    msg.vel_noise[i] = data.vel_noise[i];
+  std_msgs::msg::Header header;
+  header.stamp = node_->now();
+  header.frame_id = frame_id_;
+
+  {
+    fm_driver::msg::Result msg;
+    msg.header = header;
+    msg.local_time = data.local_time;
+    msg.cnt = data.cnt;
+    for (size_t i = 0; i < 3; i++) {
+      msg.pos[i] = data.pos[i];
+      msg.vel[i] = data.vel[i];
+      msg.pos_noise[i] = data.pos_noise[i];
+      msg.vel_noise[i] = data.vel_noise[i];
+    }
+    result_pub_->publish(msg);
   }
-  result_pub_->publish(msg);
+
+  {
+    geometry_msgs::msg::PoseWithCovarianceStamped msg;
+    msg.header = header;
+    msg.pose.pose.position.x = data.pos[0];
+    msg.pose.pose.position.y = data.pos[1];
+    msg.pose.pose.position.z = data.pos[2];
+    msg.pose.pose.orientation.w = 1.0;
+    for (size_t i = 0; i < 3; i++) {
+      double sigma = data.pos_noise[i];
+      msg.pose.covariance[i * 6 + i] = sigma * sigma;
+    }
+    result_pose_pub_->publish(msg);
+  }
 }
 
 void Ros2DataHandle::dispatch(const FMDataPrevResult &data) {

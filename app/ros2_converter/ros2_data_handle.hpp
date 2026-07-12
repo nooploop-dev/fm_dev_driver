@@ -14,6 +14,7 @@
 #include <fm_driver/msg/restart.hpp>
 #include <fm_driver/msg/result.hpp>
 #include <fm_driver/msg/spherical_result.hpp>
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/empty.hpp>
 
@@ -52,11 +53,14 @@ private:
 
   FMParserFromDev parser_;
   rclcpp::Node::SharedPtr node_;
+  std::string frame_id_;
 
   rclcpp::Publisher<fm_driver::msg::Echo>::SharedPtr echo_from_device_pub_;
   rclcpp::Publisher<fm_driver::msg::Heartbeat>::SharedPtr heartbeat_pub_;
   rclcpp::Publisher<fm_driver::msg::Param>::SharedPtr param_pub_;
   rclcpp::Publisher<fm_driver::msg::Result>::SharedPtr result_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr
+      result_pose_pub_;
   rclcpp::Publisher<fm_driver::msg::PrevResult>::SharedPtr prev_result_pub_;
   rclcpp::Publisher<fm_driver::msg::DataUserToUser>::SharedPtr
       user_data_from_device_pub_;

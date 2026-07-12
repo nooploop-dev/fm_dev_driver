@@ -13,12 +13,17 @@ Ros1DataHandle::Ros1DataHandle(ros::NodeHandle *nh) : nh_(nh) {
                           nullptr);
   s_self = this;
 
+  nh_->param<std::string>("frame_id", frame_id_, "fm_anchor_link");
+  ROS_INFO("Frame id: %s", frame_id_.c_str());
+
   // 设备 -> 用户(^)
   echo_from_device_pub_ =
       nh_->advertise<fm_driver::Echo>("echo_from_device", 50);
   heartbeat_pub_ = nh_->advertise<fm_driver::Heartbeat>("heartbeat", 50);
   param_pub_ = nh_->advertise<fm_driver::Param>("param", 50);
   result_pub_ = nh_->advertise<fm_driver::Result>("result", 50);
+  result_pose_pub_ = nh_->advertise<geometry_msgs::PoseWithCovarianceStamped>(
+      "result_pose", 50);
   prev_result_pub_ = nh_->advertise<fm_driver::PrevResult>("prev_result", 50);
   user_data_from_device_pub_ =
       nh_->advertise<fm_driver::DataUserToUser>("user_data_from_device", 50);
@@ -93,16 +98,36 @@ void Ros1DataHandle::dispatch(const FMDataParam &data) {
 }
 
 void Ros1DataHandle::dispatch(const FMDataResult &data) {
-  fm_driver::Result msg;
-  msg.local_time = data.local_time;
-  msg.cnt = data.cnt;
-  for (size_t i = 0; i < 3; i++) {
-    msg.pos[i] = data.pos[i];
-    msg.vel[i] = data.vel[i];
-    msg.pos_noise[i] = data.pos_noise[i];
-    msg.vel_noise[i] = data.vel_noise[i];
+  std_msgs::Header header;
+  header.stamp = ros::Time::now();
+  header.frame_id = frame_id_;
+  {
+    fm_driver::Result msg;
+    msg.header = header;
+    msg.local_time = data.local_time;
+    msg.cnt = data.cnt;
+    for (size_t i = 0; i < 3; i++) {
+      msg.pos[i] = data.pos[i];
+      msg.vel[i] = data.vel[i];
+      msg.pos_noise[i] = data.pos_noise[i];
+      msg.vel_noise[i] = data.vel_noise[i];
+    }
+    result_pub_.publish(msg);
   }
-  result_pub_.publish(msg);
+  {
+    // 同一份数据再发一份rviz能直接显示的标准消息
+    geometry_msgs::PoseWithCovarianceStamped msg;
+    msg.header = header;
+    msg.pose.pose.position.x = data.pos[0];
+    msg.pose.pose.position.y = data.pos[1];
+    msg.pose.pose.position.z = data.pos[2];
+    msg.pose.pose.orientation.w = 1.0;
+    for (size_t i = 0; i < 3; i++) {
+      double sigma = data.pos_noise[i];
+      msg.pose.covariance[i * 6 + i] = sigma * sigma;
+    }
+    result_pose_pub_.publish(msg);
+  }
 }
 
 void Ros1DataHandle::dispatch(const FMDataPrevResult &data) {

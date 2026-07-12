@@ -26,6 +26,7 @@ fm_driver/
 │   └── ros2_converter/       # ROS2 话题与设备数据转换节点
 ├── msg/                      # ROS 消息定义
 ├── launch/                   # ROS launch 文件
+├── rviz/                     # rviz 显示配置(ROS1/ROS2 各一份)
 ├── package.xml               # ROS 包描述
 └── CMakeLists.txt
 ```
@@ -144,8 +145,24 @@ roslaunch fm_driver msg.launch port:=/dev/ttyUSB0 baudrate:=921600
 
 - `port`：串口设备号，默认 `/dev/ttyUSB0`
 - `baudrate`：波特率，默认 `921600`
+- `frame_id`：定位结果所在坐标系，填入 `header.frame_id`，默认 `fm_anchor_link`
 
 > 若启动时报串口「Permission denied」，见下文 [串口权限（Linux）](#串口权限linux)。
+
+### 可视化（rviz）
+
+用 `rviz.launch` 一步启动「驱动 + 静态 TF + rviz」，开箱即可看到定位结果：
+
+```bash
+roslaunch fm_driver rviz.launch port:=/dev/ttyUSB0
+```
+
+除上面的参数外，还支持：
+
+- `parent_frame`：基站坐标系的父坐标系，默认 `map`
+- `anchor_pose`：基站在 `parent_frame` 中的安装位姿 `x y z yaw pitch roll`，默认 `0 0 0 0 0 0`
+- `static_tf`：是否发布 `parent_frame` → `frame_id` 的静态 TF，默认 `true`。
+  若该 TF 已由其它节点（如机器人 URDF）发布，置 `false` 避免冲突
 
 ### 查看数据
 
@@ -182,6 +199,7 @@ ros2 launch fm_driver msg.py port:=/dev/ttyACM0 baudrate:=921600
 
 - `port`：串口设备号，默认 `/dev/ttyACM0`
 - `baudrate`：波特率，默认 `921600`
+- `frame_id`：定位结果所在坐标系，填入 `header.frame_id`，默认 `fm_anchor_link`
 
 > 若启动时报串口「Permission denied」，见下文 [串口权限（Linux）](#串口权限linux)。
 
@@ -190,6 +208,21 @@ ros2 launch fm_driver msg.py port:=/dev/ttyACM0 baudrate:=921600
 ```bash
 ros2 run fm_driver ros_converter --ros-args -p port:=/dev/ttyACM0 -p baudrate:=921600
 ```
+
+### 可视化（rviz2）
+
+用 `rviz.py` 一步启动「驱动 + 静态 TF + rviz2」，开箱即可看到定位结果：
+
+```bash
+ros2 launch fm_driver rviz.py port:=/dev/ttyACM0
+```
+
+除上面的参数外，还支持：
+
+- `parent_frame`：基站坐标系的父坐标系，默认 `map`
+- `x` / `y` / `z` / `yaw` / `pitch` / `roll`：基站在 `parent_frame` 中的安装位姿，默认全 0
+- `static_tf`：是否发布 `parent_frame` → `frame_id` 的静态 TF，默认 `true`。
+  若该 TF 已由其它节点（如机器人 URDF）发布，置 `false` 避免冲突
 
 ### 查看数据
 
@@ -243,6 +276,7 @@ groups | grep dialout
 | 话题 | 消息类型 | 说明 |
 | --- | --- | --- |
 | `~/result` | `Result` | 定位结果（位置/速度/噪声） |
+| `~/result_pose` | `geometry_msgs/PoseWithCovarianceStamped` | 同一份定位结果的标准消息，供 rviz 直接显示 |
 | `~/prev_result` | `PrevResult` | 上一次定位结果（TAG） |
 | `~/spherical_result` | `SphericalResult` | 球坐标定位结果（距离/方位角/俯仰角） |
 | `~/prev_spherical_result` | `PrevSphericalResult` | 上一次球坐标结果（TAG） |

@@ -72,7 +72,8 @@ if(NOT FM_BUILD_ROS1 AND NOT FM_BUILD_ROS2)
 endif()
 
 if(FM_BUILD_ROS1)
-  find_package(catkin REQUIRED COMPONENTS roscpp std_msgs message_generation)
+  find_package(catkin REQUIRED COMPONENTS roscpp std_msgs geometry_msgs
+                                          message_generation)
   add_message_files(
     FILES
     Result.msg
@@ -89,13 +90,14 @@ if(FM_BUILD_ROS1)
     PrevSphericalResult.msg
     Dis.msg)
   generate_messages(DEPENDENCIES std_msgs)
-  catkin_package(CATKIN_DEPENDS roscpp std_msgs message_runtime)
+  catkin_package(CATKIN_DEPENDS roscpp std_msgs geometry_msgs message_runtime)
 endif()
 
 if(FM_BUILD_ROS2)
   find_package(ament_cmake REQUIRED)
   find_package(rclcpp REQUIRED)
   find_package(std_msgs REQUIRED)
+  find_package(geometry_msgs REQUIRED)
   find_package(rosidl_default_generators REQUIRED)
   rosidl_generate_interfaces(
     ${PKG_NAME}
@@ -115,7 +117,7 @@ if(FM_BUILD_ROS2)
     DEPENDENCIES
     std_msgs)
   ament_export_dependencies(rosidl_default_runtime)
-  install(DIRECTORY launch DESTINATION share/${PKG_NAME})
+  install(DIRECTORY launch rviz DESTINATION share/${PKG_NAME})
 endif()
 
 add_subdirectory(app)
