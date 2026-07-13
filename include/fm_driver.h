@@ -8,13 +8,9 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
-// 数据帧最大长度
 #define FM_FRAME_SIZE_MAX 255
-// 设备UID长度
 #define FM_UID_SIZE 6
-// 数据帧计数
 typedef uint8_t fm_frame_cnt_t;
-// 消息id
 typedef uint8_t fm_msg_id_t;
 
 // 设备角色
@@ -182,75 +178,75 @@ typedef struct {
 } FMDataDis;
 
 /**
- * @brief
- * 通过此函数将一个msg写入data封装为一帧数据，用户随后可直接将data发送给设备
+ * @brief 将一个msg封装为一帧，随后可直接把frame发送给设备
  *
- * @param connect_type 连接类型(FM_WIRED:发送给有线直连的设备;
- * FM_WIRELESS:经过有线设备中转发送给无线侧的设备)
- * @param frame_cnt 帧计数，每次需要+1
+ * @param connect_type FM_WIRED:发给有线直连设备;
+ * FM_WIRELESS:经有线设备中转发给无线侧设备
+ * @param frame_cnt 帧计数，每帧需+1
  * @param msg_id 消息id(FM_MSG_*)
- * @param msg_payload 消息负载，需传入对应msg_id的结构体指针(FMData*)
- * @param frame 输出数据缓冲区
- * @param frame_size_max 输出数据缓冲区最大大小
- * @return int 返回封装好的数据帧大小
+ * @param msg_payload 对应msg_id的结构体指针(FMData*)
+ * @param frame 输出缓冲区
+ * @param frame_size_max frame的容量
+ * @return 封装好的帧大小
  */
 int fm_prepare_msg_to_dev(fm_connect_type_e connect_type,
                           fm_frame_cnt_t frame_cnt, fm_msg_id_t msg_id,
                           const void *msg_payload, void *frame,
                           int frame_size_max);
 
-// 以下为分步骤接口，适用于需要一帧数据中包含多个msg的情况
+// 以下为分步骤接口，适用于一帧中包含多个msg的情况
 // 用法: begin 初始化 -> try_append 追加(可多次) -> end
-// 收尾，frame为同一个缓冲区
+// 收尾，frame须为同一缓冲区
 
 /**
- * @brief 开始构建一帧发往设备的数据，初始化帧头(frame中的内容会被重置)
+ * @brief 开始构建一帧发往设备的数据，初始化帧头(frame内容会被重置)
  *
- * @param frame_cnt 帧计数，每帧需要+1
- * @param frame 输出数据缓冲区(后续begin/try_append/end需传入同一缓冲)
- * @param frame_size_max 输出数据缓冲区最大大小
+ * @param frame_cnt 帧计数，每帧需+1
+ * @param frame 输出缓冲区，begin/try_append/end须传入同一个
+ * @param frame_size_max frame的容量
  */
 void fm_prepare_msg_to_dev_begin(fm_frame_cnt_t frame_cnt, void *frame,
                                  int frame_size_max);
 /**
  * @brief 向当前帧追加一个msg
  *
- * @param connect_type 连接类型(FM_WIRED:发送给有线直连的设备;
- * FM_WIRELESS:经过有线设备中转发送给无线侧的设备)
+ * @param connect_type 同fm_prepare_msg_to_dev
  * @param msg_id 消息id(FM_MSG_*)
- * @param msg_payload 消息负载，需传入对应msg_id的结构体指针(FMData*)
- * @param frame 输出数据缓冲区(同begin传入的缓冲)
- * @param frame_size_max 输出数据缓冲区最大大小
- * @return bool true:追加成功; false:剩余空间不足，未追加(应调用end结束当前帧)
+ * @param msg_payload 对应msg_id的结构体指针(FMData*)
+ * @param frame 输出缓冲区，同begin传入的那个
+ * @param frame_size_max frame的容量
+ * @return true:追加成功; false:剩余空间不足，未追加(应调用end结束当前帧)
  */
 bool fm_prepare_msg_to_dev_try_append(fm_connect_type_e connect_type,
                                       fm_msg_id_t msg_id,
                                       const void *msg_payload, void *frame,
                                       int frame_size_max);
 /**
- * @brief 结束当前帧构建，计算校验，随后可直接将frame发送给设备
+ * @brief 结束当前帧构建，计算校验，随后可直接把frame发送给设备
  *
- * @param frame 输出数据缓冲区(同begin传入的缓冲)
- * @param frame_size_max 输出数据缓冲区最大大小
- * @return int 返回封装好的数据帧大小
+ * @param frame 输出缓冲区，同begin传入的那个
+ * @param frame_size_max frame的容量
+ * @return 封装好的帧大小
  */
 int fm_prepare_msg_to_dev_end(void *frame, int frame_size_max);
 
 /**
- * @brief 收到数据帧，开始处理内部消息前的回调函数
- * @param wired_role 数据帧所属有线直连节点的角色(FM_ANCHOR/FM_TAG)
+ * @brief 每收到一帧，处理其中的消息之前回调
+ *
+ * @param wired_role 有线直连节点的角色(FM_ANCHOR/FM_TAG)
  * @param wired_uid 有线直连节点的uid(长度FM_UID_SIZE)
- * @param frame_cnt 帧计数，每帧数据会自动+1
+ * @param frame_cnt 该帧的帧计数
  */
 typedef void (*fm_on_frame_begin_from_dev_f)(fm_role_e wired_role,
                                              const uint8_t *wired_uid,
                                              fm_frame_cnt_t frame_cnt);
 
 /**
- * @brief 收到数据帧，处理内部消息的回调函数
+ * @brief 每从帧中解析出一条消息回调一次
+ *
  * @param connect_type 消息来源的连接类型
  * @param msg_id 消息id(FM_MSG_*)
- * @param msg_payload 消息负载，对应id的结构体指针(FMData*)
+ * @param msg_payload 对应msg_id的结构体指针(FMData*)
  * @param msg_payload_size 消息负载大小
  */
 typedef void (*fm_on_frame_msg_from_dev_f)(fm_connect_type_e connect_type,
@@ -259,7 +255,7 @@ typedef void (*fm_on_frame_msg_from_dev_f)(fm_connect_type_e connect_type,
                                            int msg_payload_size);
 
 /**
- * @brief 收到数据帧，处理完内部消息后的回调函数
+ * @brief 一帧内所有消息处理完毕后回调
  */
 typedef void (*fm_on_frame_end_from_dev_f)(void);
 
@@ -277,24 +273,25 @@ typedef struct {
   fm_connect_type_e connect_type; // 当前msg的连接类型
 } FMParserFromDev;
 /**
- * @brief 初始化数据解析器
+ * @brief 初始化解析器并注册回调
  *
- * @param parser 数据解析器实例
- * @param on_frame_begin 收到数据帧，开始处理内部消息前的回调函数
- * @param on_frame_msg 收到数据帧，处理内部消息的回调函数
- * @param on_frame_end 收到数据帧，处理完内部消息后的回调函数
+ * @param parser 解析器实例
+ * @param on_frame_begin 每收到一帧，处理其中的消息之前回调，不需要可传NULL
+ * @param on_frame_msg 每解析出一条消息回调一次，不需要可传NULL
+ * @param on_frame_end 一帧内所有消息处理完毕后回调，不需要可传NULL
  */
 void fm_parser_from_dev_init(FMParserFromDev *parser,
                              fm_on_frame_begin_from_dev_f on_frame_begin,
                              fm_on_frame_msg_from_dev_f on_frame_msg,
                              fm_on_frame_end_from_dev_f on_frame_end);
 /**
- * @brief
- * 用指定解析器处理接收到的数据，内部会进行数据帧提取和消息解析，并调用on_frame_*回调函数
+ * @brief 处理收到的数据: 内部完成拆帧与消息解析，并调用on_frame_*回调
  *
- * @param parser 数据解析器实例
- * @param data 接收到的数据
- * @param data_size 数据大小
+ * 串口每收到一段数据就调用一次即可，无需自行按帧切分。
+ *
+ * @param parser 解析器实例
+ * @param data 收到的数据
+ * @param data_size data的字节数
  */
 void fm_parser_from_dev_handle_data(FMParserFromDev *parser, const void *data,
                                     int data_size);

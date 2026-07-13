@@ -146,6 +146,7 @@ void Ros2DataHandle::dispatch(const FMDataResult &data) {
   }
 
   {
+    // 同一份数据再发一份rviz能直接显示的标准消息
     geometry_msgs::msg::PoseWithCovarianceStamped msg;
     msg.header = header;
     msg.pose.pose.position.x = data.pos[0];
