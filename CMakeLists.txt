@@ -11,7 +11,6 @@ option(FM_BUILD_ROS2 "build ROS2 converter" OFF)
 option(FM_BUILD_TEST "build test" ON)
 
 # 未显式选择ROS版本时，尝试根据环境变量自动检测
-# (需在FM_BUILD_FOXGLOVE之前完成，其默认值取决于是否为ROS构建)
 if(NOT FM_BUILD_ROS1 AND NOT FM_BUILD_ROS2)
   if(DEFINED ENV{ROS_VERSION})
     if("$ENV{ROS_VERSION}" STREQUAL "1")
@@ -22,9 +21,7 @@ if(NOT FM_BUILD_ROS1 AND NOT FM_BUILD_ROS2)
   endif()
 endif()
 
-# ROS构建默认不启用Foxglove：ROS用户通常只需要ROS节点，而启用会自动下载
-# 数十MB的Foxglove SDK，离线环境/CI会因此构建失败。
-# 非ROS构建(独立的reader)则默认启用，开箱即可可视化。两者均可显式覆盖。
+# 非ROS构建时默认启用FOXGLOVE可视化支持
 if(FM_BUILD_ROS1 OR FM_BUILD_ROS2)
   set(FM_FOXGLOVE_DEFAULT OFF)
 else()
@@ -58,19 +55,9 @@ else()
 endif()
 
 set(LIB_DEV_DRIVER lib_${PKG_NAME})
-add_library(
-  ${LIB_DEV_DRIVER} STATIC
-  src/fm_crc.c
-  src/fm_crc.h
-  src/fm_msg.h
-  src/fm_frame.c
-  src/fm_frame.h
-  src/fm_driver_raw.h
-  src/fm_driver.c)
-target_include_directories(
-  ${LIB_DEV_DRIVER}
-  PUBLIC include
-  PRIVATE src)
+add_library(${LIB_DEV_DRIVER} STATIC src/fm_crc.c src/fm_frame.c
+                                     src/fm_driver.c)
+target_include_directories(${LIB_DEV_DRIVER} PUBLIC include)
 
 include(FetchContent)
 if(FM_BUILD_TEST)
