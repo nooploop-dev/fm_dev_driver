@@ -1,8 +1,9 @@
 #include "main_common.hpp"
+#include <CLI/CLI.hpp>
 #include <chrono>
 #include <csignal>
-#include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <spdlog/fmt/ranges.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -11,6 +12,13 @@
 #include <thread>
 
 namespace {
+
+constexpr int BAUD_RATE = 921600;
+
+// CLI::PositiveNumber按浮点校验, 报错信息带double范围, 这里按整数校验
+CLI::Validator positive_int() {
+  return CLI::Range(1, std::numeric_limits<int>::max()).description("POSITIVE");
+}
 
 void send_msg(fm_connect_type_e connect_type, fm_msg_id_t msg_id,
               const void *msg_payload, const char *desc) {
@@ -60,16 +68,17 @@ void send_all() {
 } // namespace
 
 int main(int argc, char **argv) {
-  if (argc != 3) {
-    spdlog::info("Usage: {} <serial-port> <baudrate>", argv[0]);
-    return 1;
-  }
-  const std::string port = argv[1];
-  int baud_rate = std::atoi(argv[2]);
-  if (baud_rate <= 0) {
-    spdlog::error("Invalid baudrate: {}", argv[2]);
-    return 2;
-  }
+  CLI::App app{"Assemble and send messages to an AOA device", APP_NAME};
+  argv = app.ensure_utf8(argv);
+
+  std::string port;
+  int baud_rate = BAUD_RATE;
+  app.add_option("--port", port, "serial port, e.g. /dev/ttyUSB0")->required();
+  app.add_option("--baudrate", baud_rate, "serial baud rate")
+      ->check(positive_int())
+      ->capture_default_str();
+  CLI11_PARSE(app, argc, argv);
+
   spdlog::info("Sending on {} at {} baud", port, baud_rate);
   std::thread sender(send_all);
   main_common_init(port, baud_rate, nullptr);

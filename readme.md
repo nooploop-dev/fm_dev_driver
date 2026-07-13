@@ -213,7 +213,8 @@ ros2 topic echo /ros_converter/result     # ROS2
 
 ```bash
 cmake -B build && cmake --build build
-./build/app/reader/reader /dev/ttyUSB0 921600   # 可选第三个参数指定端口，默认 8765
+./build/app/reader/reader --port /dev/ttyUSB0   # 波特率默认 921600，Foxglove 端口默认 8765
+./build/app/reader/reader --port /dev/ttyUSB0 --baudrate 921600 --foxglove_port 8765
 ```
 
 然后在 Foxglove 中选择 **Open connection → Foxglove WebSocket**，地址填 `ws://<设备IP>:8765`。日志打印保持原样，两者同时输出。

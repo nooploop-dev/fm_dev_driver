@@ -1,7 +1,8 @@
 #include "foxglove_viz.hpp"
 #include "main_common.hpp"
 #include "reader_data_handle.hpp"
-#include <cstdlib>
+#include <CLI/CLI.hpp>
+#include <limits>
 #include <memory>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -13,32 +14,33 @@ namespace {
 constexpr char LOG_FILE[] = "logs/logger.log";
 constexpr std::size_t MAX_FILE_SIZE = 10 * 1024 * 1024;
 constexpr std::size_t MAX_FILE_COUNT = 3;
+constexpr int BAUD_RATE = 921600;
 // Foxglove可视化(仅在开启FM_BUILD_FOXGLOVE时生效)
 constexpr char FOXGLOVE_HOST[] = "0.0.0.0";
 constexpr uint16_t FOXGLOVE_PORT = 8765;
 constexpr char FOXGLOVE_FRAME_ID[] = "fm_anchor_link";
+
+// CLI::PositiveNumber按浮点校验, 报错信息带double范围, 这里按整数校验
+CLI::Validator positive_int() {
+  return CLI::Range(1, std::numeric_limits<int>::max()).description("POSITIVE");
+}
 } // namespace
 
 int main(int argc, char **argv) {
-  if (argc < 3 || argc > 4) {
-    spdlog::info("Usage: {} <serial-port> <baudrate> [foxglove-port]", argv[0]);
-    return 1;
-  }
-  const std::string port = argv[1];
-  int baud_rate = std::atoi(argv[2]);
-  if (baud_rate <= 0) {
-    spdlog::error("Invalid baudrate: {}", argv[2]);
-    return 2;
-  }
+  CLI::App app{"Receive and parse data from an AOA device", APP_NAME};
+  argv = app.ensure_utf8(argv);
+
+  std::string port;
+  int baud_rate = BAUD_RATE;
   uint16_t foxglove_port = FOXGLOVE_PORT;
-  if (argc == 4) {
-    int p = std::atoi(argv[3]);
-    if (p <= 0 || p > 65535) {
-      spdlog::error("Invalid foxglove port: {}", argv[3]);
-      return 3;
-    }
-    foxglove_port = uint16_t(p);
-  }
+  app.add_option("--port", port, "serial port, e.g. /dev/ttyUSB0")->required();
+  app.add_option("--baudrate", baud_rate, "serial baud rate")
+      ->check(positive_int())
+      ->capture_default_str();
+  app.add_option("--foxglove_port", foxglove_port, "Foxglove WebSocket port")
+      ->check(CLI::Range(1, 65535))
+      ->capture_default_str();
+  CLI11_PARSE(app, argc, argv);
 
   {
     std::vector<spdlog::sink_ptr> sinks;

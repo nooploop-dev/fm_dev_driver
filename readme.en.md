@@ -217,7 +217,8 @@ machines without a ROS installation. **It is on by default in non-ROS builds**:
 
 ```bash
 cmake -B build && cmake --build build
-./build/app/reader/reader /dev/ttyUSB0 921600   # optional 3rd arg sets the port, default 8765
+./build/app/reader/reader --port /dev/ttyUSB0   # baudrate defaults to 921600, Foxglove port to 8765
+./build/app/reader/reader --port /dev/ttyUSB0 --baudrate 921600 --foxglove_port 8765
 ```
 
 Then in Foxglove choose **Open connection → Foxglove WebSocket** and enter

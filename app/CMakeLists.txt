@@ -20,6 +20,15 @@ if(FM_BUILD_READER OR FM_BUILD_WRITER)
       GIT_TAG v1.15.3)
     FetchContent_MakeAvailable(spdlog)
   endif()
+
+  if(NOT TARGET CLI11)
+    FetchContent_Declare(
+      CLI11
+      GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+      GIT_TAG v2.5.0)
+    FetchContent_MakeAvailable(CLI11)
+  endif()
+
 endif()
 
 if(FM_BUILD_READER)
