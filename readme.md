@@ -228,6 +228,18 @@ cmake -B build && cmake --build build
 | `/spherical_result` | JSON | 距离/方位角/俯仰角，供 Plot 面板绘制曲线 |
 | `/dis` | JSON | 测距结果，供 Plot 面板绘制曲线 |
 
+### 数据录制（MCAP）
+
+加 `--record` 即可把上表中的所有话题录制成 MCAP 文件，事后可直接拖进 Foxglove 回放：
+
+```bash
+./build/app/reader/reader --port /dev/ttyUSB0 --record
+```
+
+文件写入 `logs/fm_<日期时间>.mcap`（与日志同目录，例如 `logs/fm_20260713_182432_123.mcap`，精确到毫秒，多次运行不会互相覆盖）。录制与 WebSocket 服务相互独立，可同时使用。
+
+> 录制依赖 Foxglove SDK，需要 `FM_BUILD_FOXGLOVE=ON`（非 ROS 构建下默认开启）。请用 `Ctrl+C` 正常退出，程序会在退出时写入索引并关闭文件；强杀（`kill -9`）会导致 MCAP 缺少索引而无法打开。
+
 ## 串口权限（Linux）
 
 首次访问串口时常见如下报错：

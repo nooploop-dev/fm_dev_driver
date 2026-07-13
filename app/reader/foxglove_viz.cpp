@@ -7,6 +7,7 @@
 
 #include <foxglove/channel.hpp>
 #include <foxglove/error.hpp>
+#include <foxglove/mcap.hpp>
 #include <foxglove/messages.hpp>
 #include <foxglove/websocket.hpp>
 
@@ -15,6 +16,7 @@ namespace {
 namespace fgm = foxglove::messages;
 
 std::optional<foxglove::WebSocketServer> s_server;
+std::optional<foxglove::McapWriter> s_writer;
 std::optional<fgm::FrameTransformChannel> s_tf_ch;
 std::optional<fgm::PoseInFrameChannel> s_pose_ch;
 std::optional<fgm::SceneUpdateChannel> s_scene_ch;
@@ -97,25 +99,13 @@ std::optional<T> take(foxglove::FoxgloveResult<T> &&result, const char *topic) {
   return std::optional<T>(std::move(result.value()));
 }
 
-} // namespace
-
-namespace foxglove_viz {
-
-bool init(const std::string &host, uint16_t port, const std::string &frame_id) {
-  s_frame_id = frame_id;
-
-  foxglove::WebSocketServerOptions options;
-  options.name = "fm_reader";
-  options.host = host;
-  options.port = port;
-
-  auto server = foxglove::WebSocketServer::create(std::move(options));
-  if (!server.has_value()) {
-    spdlog::error("Foxglove: failed to start server on {}:{}: {}", host, port,
-                  foxglove::strerror(server.error()));
-    return false;
+// 通道只创建一次，WebSocket服务与MCAP录制都是它的下游(sink)，各自可独立启停
+void ensure_channels() {
+  static bool created = false;
+  if (created) {
+    return;
   }
-  s_server.emplace(std::move(server.value()));
+  created = true;
 
   s_tf_ch = take(fgm::FrameTransformChannel::create("/tf"), "/tf");
   s_pose_ch =
@@ -135,13 +125,48 @@ bool init(const std::string &host, uint16_t port, const std::string &frame_id) {
       foxglove::RawChannel::create("/dis", "json",
                                    json_schema("fm.Dis", DIS_SCHEMA)),
       "/dis");
+}
+
+} // namespace
+
+namespace foxglove_viz {
+
+bool init(const std::string &host, uint16_t port, const std::string &frame_id) {
+  s_frame_id = frame_id;
+  ensure_channels();
+
+  foxglove::WebSocketServerOptions options;
+  options.name = "fm_reader";
+  options.host = host;
+  options.port = port;
+
+  auto server = foxglove::WebSocketServer::create(std::move(options));
+  if (!server.has_value()) {
+    spdlog::error("Foxglove: failed to start server on {}:{}: {}", host, port,
+                  foxglove::strerror(server.error()));
+    return false;
+  }
+  s_server.emplace(std::move(server.value()));
+  return true;
+}
+
+bool record_start(const std::string &file_path) {
+  ensure_channels();
+
+  foxglove::McapWriterOptions options;
+  options.path = file_path;
+
+  auto writer = foxglove::McapWriter::create(options);
+  if (!writer.has_value()) {
+    spdlog::error("Record: failed to create '{}': {}", file_path,
+                  foxglove::strerror(writer.error()));
+    return false;
+  }
+  s_writer.emplace(std::move(writer.value()));
   return true;
 }
 
 void publish(const FMDataResult &data) {
-  if (!s_server) {
-    return;
-  }
   auto ts = now_ts();
 
   // 根坐标系 -> 基站坐标系。3D面板需要这个TF，定位点才有落脚的frame
@@ -211,9 +236,6 @@ void publish(const FMDataResult &data) {
 }
 
 void publish(const FMDataSphericalResult &data) {
-  if (!s_server) {
-    return;
-  }
   log_json(s_spherical_ch,
            fmt::format(R"({{"local_time":{},"cnt":{},"dis":{},)"
                        R"("azimuth":{},"elevation":{}}})",
@@ -222,9 +244,6 @@ void publish(const FMDataSphericalResult &data) {
 }
 
 void publish(const FMDataDis &data) {
-  if (!s_server) {
-    return;
-  }
   log_json(s_dis_ch,
            fmt::format(
                R"({{"local_time":{},"cnt":{},"dis":{},"rx_rate":{}}})",
@@ -235,6 +254,15 @@ void shutdown() {
   if (s_server) {
     s_server->stop();
     s_server.reset();
+  }
+  if (s_writer) {
+    // 不close的话MCAP缺少索引/统计信息，Foxglove无法正常打开
+    auto err = s_writer->close();
+    if (err != foxglove::FoxgloveError::Ok) {
+      spdlog::error("Record: failed to close file: {}",
+                    foxglove::strerror(err));
+    }
+    s_writer.reset();
   }
 }
 

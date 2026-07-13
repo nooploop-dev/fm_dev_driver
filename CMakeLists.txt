@@ -36,7 +36,6 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-add_compile_definitions("$<$<CONFIG:Debug>:DEBUG>")
 foreach(lang C CXX)
   foreach(config RELEASE MINSIZEREL RELWITHDEBINFO)
     string(REGEX REPLACE "[-/]D[ ]?NDEBUG" "" CMAKE_${lang}_FLAGS_${config}

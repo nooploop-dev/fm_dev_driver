@@ -233,6 +233,25 @@ Then in Foxglove choose **Open connection → Foxglove WebSocket** and enter
 | `/spherical_result` | JSON | Distance/azimuth/elevation, for the Plot panel |
 | `/dis` | JSON | Ranging result, for the Plot panel |
 
+### Recording (MCAP)
+
+Pass `--record` to record every topic in the table above into an MCAP file, which
+you can drop straight into Foxglove for replay:
+
+```bash
+./build/app/reader/reader --port /dev/ttyUSB0 --record
+```
+
+The file is written to `logs/fm_<datetime>.mcap`, next to the log file (e.g.
+`logs/fm_20260713_182432_123.mcap`; it is precise to the millisecond, so repeated
+runs never overwrite each other). Recording and the WebSocket server are
+independent and can be used together.
+
+> Recording relies on the Foxglove SDK, so it requires `FM_BUILD_FOXGLOVE=ON` (on
+> by default in non-ROS builds). Exit with `Ctrl+C`: the file is indexed and
+> closed on shutdown, whereas killing the process (`kill -9`) leaves the MCAP
+> without an index and it will not open.
+
 ## Serial Port Permissions (Linux)
 
 Accessing a serial port for the first time often fails like this:
