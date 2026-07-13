@@ -12,7 +12,7 @@
 ```text
 fm_driver/
 ├── include/                  # 对外公共头
-│   └─ fm_driver.h           #   驱动接口(集成时通常只需这一个)
+│   └── fm_driver_for_user.h  #   驱动接口(集成时通常只需这一个)
 ├── src/                      # 纯C驱动实现(需一起加入编译)
 │   ├── fm_crc.c/.h           #   CRC 校验
 │   ├── fm_frame.c/.h         #   帧组装/拆解
@@ -41,13 +41,13 @@ fm_driver/
 - 源文件：`src/fm_crc.c`、`src/fm_frame.c`、`src/fm_driver.c`
 - 头文件目录：`include/`
 
-业务代码中只需 `#include "fm_driver.h"`。驱动遵循 C11，无动态内存分配、无第三方依赖，适合资源受限的 MCU。
+业务代码中只需 `#include "fm_driver_for_user.h"`。驱动遵循 C11，无动态内存分配、无第三方依赖，适合资源受限的 MCU。
 
 > 纯 C 工程不需要 `app/`。若想了解如何把驱动接口接入实际收发流程，可参考 [`app/reader/`](app/reader/)（解析）和 [`app/writer/`](app/writer/)（组包）。示例用 C++ 实现串口与日志，但调用的驱动接口与纯 C 工程完全相同。
 
 ### 接口概览
 
-所有接口与消息结构体都定义在 [include/fm_driver.h](include/fm_driver.h) 中，通信分「设备 → 用户」和「用户 → 设备」两个方向：
+所有接口与消息结构体都定义在 [include/fm_driver_for_user.h](include/fm_driver_for_user.h) 中，通信分「设备 → 用户」和「用户 → 设备」两个方向：
 
 - **组包**：`fm_prepare_msg_to_dev()` 将一个消息（`FMData*` 结构体）封装为一帧，返回帧长度，随后把该帧通过串口发给设备。
   - 如需在一帧里打包多条消息，使用分步接口：`fm_prepare_msg_to_dev_begin()` → `fm_prepare_msg_to_dev_try_append()`（可多次）→ `fm_prepare_msg_to_dev_end()`。
@@ -60,7 +60,7 @@ fm_driver/
 ### 最小示例
 
 ```c
-#include "fm_driver.h"
+#include "fm_driver_for_user.h"
 #include <stdio.h>
 
 // —— 接收：每解析出一条设备上报的消息时被回调 ——

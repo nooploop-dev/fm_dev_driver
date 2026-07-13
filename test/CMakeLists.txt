@@ -1,4 +1,4 @@
-# 黑盒测试: 仅依赖对外的 fm_driver.h
+# 黑盒测试: 仅依赖对外的 fm_driver_for_user.h
 set(TARGET_NAME test_fm_driver)
 add_executable(${TARGET_NAME} ${TARGET_NAME}.cpp)
 target_link_libraries(${TARGET_NAME} PRIVATE ${LIB_DEV_DRIVER}

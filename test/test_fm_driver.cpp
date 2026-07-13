@@ -1,11 +1,11 @@
 #include "catch2/catch_all.hpp"
-#include "fm_driver.h"
+#include "fm_driver_for_user.h"
 #include "fm_driver_for_dev.h"
 #include <cstring>
 #include <initializer_list>
 #include <vector>
 
-// 测试仅依赖对外的 fm_driver.h:
+// 测试仅依赖对外的 fm_driver_for_user.h:
 // - user->dev 方向: fm_prepare_msg_to_dev[_*] 构造 <-> fm_parser_from_user 解析
 // - dev->user 方向: fm_prepare_msg_to_user[_*] 构造 <-> fm_parser_from_dev 解析
 // 回调无 arg，借助文件作用域变量捕获结果(解析夹具构造时清空)

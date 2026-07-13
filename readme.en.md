@@ -12,7 +12,7 @@ This repository contains the driver code for the Nooploop [AOA Follow Me](https:
 ```text
 fm_driver/
 ├── include/                  # Public headers
-│   └── fm_driver.h           #   Driver API (usually the only one you need)
+│   └── fm_driver_for_user.h  #   Driver API (usually the only one you need)
 ├── src/                      # Pure C driver implementation (compile these too)
 │   ├── fm_crc.c/.h           #   CRC checksum
 │   ├── fm_frame.c/.h         #   Frame assembly/disassembly
@@ -41,13 +41,13 @@ The pure C driver does just two things: **encode** the messages you want to send
 - Source files: `src/fm_crc.c`, `src/fm_frame.c`, `src/fm_driver.c`
 - Header directory: `include/`
 
-In your application code you only need `#include "fm_driver.h"`. The driver targets C11, performs no dynamic memory allocation, and has no third-party dependencies, making it suitable for resource-constrained MCUs.
+In your application code you only need `#include "fm_driver_for_user.h"`. The driver targets C11, performs no dynamic memory allocation, and has no third-party dependencies, making it suitable for resource-constrained MCUs.
 
 > A pure C project does not need `app/`. For examples of wiring the driver APIs into real I/O, see [`app/reader/`](app/reader/) (parsing) and [`app/writer/`](app/writer/) (encoding). The examples use C++ for serial I/O and logging, but call exactly the same driver APIs as a pure C project.
 
 ### API Overview
 
-All APIs and message structs are defined in [include/fm_driver.h](include/fm_driver.h). Communication has two directions, "device → user" and "user → device":
+All APIs and message structs are defined in [include/fm_driver_for_user.h](include/fm_driver_for_user.h). Communication has two directions, "device → user" and "user → device":
 
 - **Encoding**: `fm_prepare_msg_to_dev()` packs one message (a `FMData*` struct) into a frame and returns the frame length. You then send the frame to the device over the serial port.
   - To pack multiple messages into a single frame, use the step-by-step API: `fm_prepare_msg_to_dev_begin()` → `fm_prepare_msg_to_dev_try_append()` (callable multiple times) → `fm_prepare_msg_to_dev_end()`.
@@ -60,7 +60,7 @@ All APIs and message structs are defined in [include/fm_driver.h](include/fm_dri
 ### Minimal Example
 
 ```c
-#include "fm_driver.h"
+#include "fm_driver_for_user.h"
 #include <stdio.h>
 
 // —— Receiving: invoked once per parsed message reported by the device ——
