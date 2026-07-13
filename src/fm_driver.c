@@ -8,6 +8,10 @@
 #include <stddef.h>
 #include <string.h>
 
+#ifdef FM_DRIVER_DATA_EXTEND_ENABLED
+#include "fm_driver_data_raw_extend.h"
+#endif
+
 // 无线封装消息不对外暴露，但协议层仍使用固定 ID。
 enum {
   FM_MSG_INTERNAL_DATA_USER_TO_DEV = 34,
@@ -17,9 +21,24 @@ enum {
 // encode: 表示将消息结构体从app层(FMData*)转换为协议层(FMRawData*)
 // decode: 表示将消息结构体从协议层(FMRawData*)转换为app层(FMData*)
 
+// 解码时承载FMData*结构体的缓冲区。
+// 必须用union保证对齐: 裸uint8_t[]的对齐只有1，而FMDataResult等含int64_t的
+// 结构体要求8字节对齐，强转后写入是未定义行为(ARM上可能触发对齐异常)。
+// 消息结构体最大字节数，下面所有定义的结构体都必须小于等于该值，否则解析会异常
+// (解析时由FM_MSG_DISPATCH中的_Static_assert在编译期强制保证)
+#define FM_DATA_BYTES_MAX 127
+typedef union {
+  uint8_t bytes[FM_DATA_BYTES_MAX];
+  int64_t align_i64;
+  double align_f64;
+  void *align_ptr;
+} FMDataBuf;
+
+// 将对外msg(FMData*)按 user->dev 方向转换为协议payload，返回payload大小。
+// size为-1表示该msg_id在本方向上非法(与"合法的空负载消息"的0区分开)。
 static int fm_user_to_dev_encode(fm_msg_id_t msg_id, const void *app,
-                                 uint8_t *out) {
-  int size = 0;
+                                 uint8_t *out, int out_size_max) {
+  int size = -1;
   switch (msg_id) {
   case FM_MSG_ECHO:
     fm_data_echo_to_raw(app, out, &size);
@@ -31,6 +50,7 @@ static int fm_user_to_dev_encode(fm_msg_id_t msg_id, const void *app,
     fm_data_restart_to_raw(app, out, &size);
     break;
   case FM_MSG_PARAM_READ:
+    size = 0; // 无负载的读取命令
     break;
   case FM_MSG_PARAM_WRITE:
     fm_data_param_to_raw(app, out, &size);
@@ -45,16 +65,21 @@ static int fm_user_to_dev_encode(fm_msg_id_t msg_id, const void *app,
     fm_data_user_to_user_to_raw(app, out, &size);
     break;
   default:
-    assert(0 && "msg_id is not valid for user->dev direction");
+#ifdef FM_DRIVER_DATA_EXTEND_ENABLED
+    fm_user_to_dev_encode_extend(msg_id, app, out, out_size_max, &size);
+#else
+    (void)out_size_max;
+#endif
     break;
   }
-  return size;
+  assert(size >= 0 && "msg_id is not valid for user->dev direction");
+  return size < 0 ? 0 : size;
 }
 
-// 将对外msg(FMData*)按 dev->user 方向转换为协议payload，返回payload大小
+// 将对外msg(FMData*)按 dev->user 方向转换为协议payload，返回payload大小。
 static int fm_dev_to_user_encode(fm_msg_id_t msg_id, const void *app,
-                                 uint8_t *out) {
-  int size = 0;
+                                 uint8_t *out, int out_size_max) {
+  int size = -1;
   switch (msg_id) {
   case FM_MSG_ECHO:
     fm_data_echo_to_raw(app, out, &size);
@@ -96,21 +121,26 @@ static int fm_dev_to_user_encode(fm_msg_id_t msg_id, const void *app,
     fm_data_dis_to_raw(app, out, &size);
     break;
   default:
-    assert(0 && "msg_id is not valid for dev->user direction");
+#ifdef FM_DRIVER_DATA_EXTEND_ENABLED
+    fm_dev_to_user_encode_extend(msg_id, app, out, out_size_max, &size);
+#else
+    (void)out_size_max;
+#endif
     break;
   }
-  return size;
+  assert(size >= 0 && "msg_id is not valid for dev->user direction");
+  return size < 0 ? 0 : size;
 }
 
-#define FM_DEV_TO_USER_DISPATCH(PROTO, FROM, APPTYPE)                          \
+#define FM_MSG_DISPATCH(RAW, RAW2DATA, DATA)                                   \
   do {                                                                         \
-    PROTO p;                                                                   \
-    fm_msg_copy_payload(&p, sizeof(p), msg->payload, msg->payload_size);       \
-    APPTYPE a;                                                                 \
-    FROM(&p, &a);                                                              \
-    if (parser->on_frame_msg) {                                                \
-      parser->on_frame_msg(parser->connect_type, msg->id, &a, (int)sizeof(a)); \
-    }                                                                          \
+    _Static_assert(sizeof(DATA) <= FM_DATA_BYTES_MAX, #DATA                    \
+                   " exceeds FM_DATA_BYTES_MAX (would overflow data_buf)");    \
+    RAW raw;                                                                   \
+    fm_msg_copy_payload(&raw, sizeof(raw), msg->payload, msg->payload_size);   \
+    DATA *data = (DATA *)data_buf.bytes;                                       \
+    RAW2DATA(&raw, data);                                                      \
+    data_size = (int)sizeof(DATA);                                             \
   } while (0)
 
 static void fm_dev_to_user_decode(void *arg, const FMData *msg);
@@ -142,53 +172,51 @@ static void fm_parser_from_dev_user_to_user(FMParserFromDev *parser,
 
 static void fm_dev_to_user_decode(void *arg, const FMData *msg) {
   FMParserFromDev *parser = (FMParserFromDev *)arg;
+  FMDataBuf data_buf;
+  int data_size = -1;
   switch (msg->id) {
   case FM_MSG_ECHO:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataEcho, fm_data_echo_from_raw, FMDataEcho);
+    FM_MSG_DISPATCH(FMRawDataEcho, fm_data_echo_from_raw, FMDataEcho);
     break;
   case FM_MSG_FIND:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataFind, fm_data_find_from_raw, FMDataFind);
+    FM_MSG_DISPATCH(FMRawDataFind, fm_data_find_from_raw, FMDataFind);
     break;
   case FM_MSG_RESTART:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataRestart, fm_data_restart_from_raw,
-                            FMDataRestart);
+    FM_MSG_DISPATCH(FMRawDataRestart, fm_data_restart_from_raw, FMDataRestart);
     break;
   case FM_MSG_HEARTBEAT:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataHeartbeat, fm_data_heartbeat_from_raw,
-                            FMDataHeartbeat);
+    FM_MSG_DISPATCH(FMRawDataHeartbeat, fm_data_heartbeat_from_raw,
+                    FMDataHeartbeat);
     break;
   case FM_MSG_RESULT:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataResult, fm_data_result_from_raw,
-                            FMDataResult);
+    FM_MSG_DISPATCH(FMRawDataResult, fm_data_result_from_raw, FMDataResult);
     break;
   case FM_MSG_PREV_RESULT:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataPrevResult, fm_data_prev_result_from_raw,
-                            FMDataPrevResult);
+    FM_MSG_DISPATCH(FMRawDataPrevResult, fm_data_prev_result_from_raw,
+                    FMDataPrevResult);
     break;
   case FM_MSG_DIS:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataDis, fm_data_dis_from_raw, FMDataDis);
+    FM_MSG_DISPATCH(FMRawDataDis, fm_data_dis_from_raw, FMDataDis);
     break;
   case FM_MSG_BEGIN_PAIR:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataBeginPair, fm_data_begin_pair_from_raw,
-                            FMDataBeginPair);
+    FM_MSG_DISPATCH(FMRawDataBeginPair, fm_data_begin_pair_from_raw,
+                    FMDataBeginPair);
     break;
   case FM_MSG_CANCEL_PAIR:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataCancelPair, fm_data_cancel_pair_from_raw,
-                            FMDataCancelPair);
+    FM_MSG_DISPATCH(FMRawDataCancelPair, fm_data_cancel_pair_from_raw,
+                    FMDataCancelPair);
     break;
   case FM_MSG_SPHERICAL_RESULT:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataSphericalResult,
-                            fm_data_spherical_result_from_raw,
-                            FMDataSphericalResult);
+    FM_MSG_DISPATCH(FMRawDataSphericalResult, fm_data_spherical_result_from_raw,
+                    FMDataSphericalResult);
     break;
   case FM_MSG_PREV_SPHERICAL_RESULT:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataPrevSphericalResult,
-                            fm_data_spherical_prev_result_from_raw,
-                            FMDataSphericalPrevResult);
+    FM_MSG_DISPATCH(FMRawDataPrevSphericalResult,
+                    fm_data_spherical_prev_result_from_raw,
+                    FMDataSphericalPrevResult);
     break;
   case FM_MSG_PARAM:
-    FM_DEV_TO_USER_DISPATCH(FMRawDataParam, fm_data_param_from_raw,
-                            FMDataParam);
+    FM_MSG_DISPATCH(FMRawDataParam, fm_data_param_from_raw, FMDataParam);
     break;
   case FM_MSG_INTERNAL_DATA_DEV_TO_USER:
     fm_parser_from_dev_dev_to_user(parser, msg);
@@ -197,20 +225,18 @@ static void fm_dev_to_user_decode(void *arg, const FMData *msg) {
     fm_parser_from_dev_user_to_user(parser, msg);
     break;
   default:
+#ifdef FM_DRIVER_DATA_EXTEND_ENABLED
+    fm_dev_to_user_decode_extend(msg->id, msg->payload, msg->payload_size,
+                                  data_buf.bytes, sizeof(data_buf.bytes),
+                                  &data_size);
+#endif
     break;
   }
+  if (parser->on_frame_msg && data_size >= 0) {
+    parser->on_frame_msg(parser->connect_type, msg->id, data_buf.bytes,
+                         data_size);
+  }
 }
-
-#define FM_USER_TO_DEV_DISPATCH(PROTO, FROM, APPTYPE)                          \
-  do {                                                                         \
-    PROTO p;                                                                   \
-    fm_msg_copy_payload(&p, sizeof(p), msg->payload, msg->payload_size);       \
-    APPTYPE a;                                                                 \
-    FROM(&p, &a);                                                              \
-    if (parser->on_frame_msg) {                                                \
-      parser->on_frame_msg(parser->connect_type, msg->id, &a, (int)sizeof(a)); \
-    }                                                                          \
-  } while (0)
 
 static void fm_user_to_dev_decode(void *arg, const FMData *msg);
 
@@ -240,34 +266,32 @@ static void fm_parser_from_user_user_to_user(FMParserFromUser *parser,
 
 static void fm_user_to_dev_decode(void *arg, const FMData *msg) {
   FMParserFromUser *parser = (FMParserFromUser *)arg;
+  FMDataBuf data_buf;
+  int data_size = -1;
   switch (msg->id) {
   // 无负载的读取命令
   case FM_MSG_PARAM_READ:
-    if (parser->on_frame_msg) {
-      parser->on_frame_msg(parser->connect_type, msg->id, NULL, 0);
-    }
+    data_size = 0;
     break;
   case FM_MSG_ECHO:
-    FM_USER_TO_DEV_DISPATCH(FMRawDataEcho, fm_data_echo_from_raw, FMDataEcho);
+    FM_MSG_DISPATCH(FMRawDataEcho, fm_data_echo_from_raw, FMDataEcho);
     break;
   case FM_MSG_FIND:
-    FM_USER_TO_DEV_DISPATCH(FMRawDataFind, fm_data_find_from_raw, FMDataFind);
+    FM_MSG_DISPATCH(FMRawDataFind, fm_data_find_from_raw, FMDataFind);
     break;
   case FM_MSG_RESTART:
-    FM_USER_TO_DEV_DISPATCH(FMRawDataRestart, fm_data_restart_from_raw,
-                            FMDataRestart);
+    FM_MSG_DISPATCH(FMRawDataRestart, fm_data_restart_from_raw, FMDataRestart);
     break;
   case FM_MSG_BEGIN_PAIR:
-    FM_USER_TO_DEV_DISPATCH(FMRawDataBeginPair, fm_data_begin_pair_from_raw,
-                            FMDataBeginPair);
+    FM_MSG_DISPATCH(FMRawDataBeginPair, fm_data_begin_pair_from_raw,
+                    FMDataBeginPair);
     break;
   case FM_MSG_CANCEL_PAIR:
-    FM_USER_TO_DEV_DISPATCH(FMRawDataCancelPair, fm_data_cancel_pair_from_raw,
-                            FMDataCancelPair);
+    FM_MSG_DISPATCH(FMRawDataCancelPair, fm_data_cancel_pair_from_raw,
+                    FMDataCancelPair);
     break;
   case FM_MSG_PARAM:
-    FM_USER_TO_DEV_DISPATCH(FMRawDataParam, fm_data_param_from_raw,
-                            FMDataParam);
+    FM_MSG_DISPATCH(FMRawDataParam, fm_data_param_from_raw, FMDataParam);
     break;
   case FM_MSG_INTERNAL_DATA_USER_TO_DEV:
     fm_parser_from_user_user_to_dev(parser, msg);
@@ -276,7 +300,16 @@ static void fm_user_to_dev_decode(void *arg, const FMData *msg) {
     fm_parser_from_user_user_to_user(parser, msg);
     break;
   default:
+#ifdef FM_DRIVER_DATA_EXTEND_ENABLED
+    fm_user_to_dev_decode_extend(msg->id, msg->payload, msg->payload_size,
+                                  data_buf.bytes, sizeof(data_buf.bytes),
+                                  &data_size);
+#endif
     break;
+  }
+  if (parser->on_frame_msg && data_size >= 0) {
+    parser->on_frame_msg(parser->connect_type, msg->id, data_buf.bytes,
+                         data_size);
   }
 }
 
@@ -286,7 +319,8 @@ static int fm_build_msg_to_dev(fm_connect_type_e connect_type,
                                fm_msg_id_t msg_id, const void *msg_payload,
                                uint8_t *out, int out_size_max) {
   uint8_t raw_data[FM_MSG_PAYLOAD_SIZE_MAX];
-  int raw_data_size = fm_user_to_dev_encode(msg_id, msg_payload, raw_data);
+  int raw_data_size = fm_user_to_dev_encode(msg_id, msg_payload, raw_data,
+                                            (int)sizeof(raw_data));
   if (connect_type == FM_WIRED) {
     if (FM_MSG_HEADER_SIZE + raw_data_size > out_size_max) {
       return 0;
@@ -358,7 +392,8 @@ static int fm_build_msg_to_user(fm_connect_type_e connect_type,
                                 fm_msg_id_t msg_id, const void *msg_payload,
                                 uint8_t *out, int out_size_max) {
   uint8_t raw_data[FM_MSG_PAYLOAD_SIZE_MAX];
-  int raw_data_size = fm_dev_to_user_encode(msg_id, msg_payload, raw_data);
+  int raw_data_size = fm_dev_to_user_encode(msg_id, msg_payload, raw_data,
+                                            (int)sizeof(raw_data));
   if (connect_type == FM_WIRED) {
     if (FM_MSG_HEADER_SIZE + raw_data_size > out_size_max) {
       return 0;

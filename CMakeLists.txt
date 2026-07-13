@@ -58,6 +58,9 @@ set(LIB_DEV_DRIVER lib_${PKG_NAME})
 add_library(${LIB_DEV_DRIVER} STATIC src/fm_crc.c src/fm_frame.c
                                      src/fm_driver.c)
 target_include_directories(${LIB_DEV_DRIVER} PUBLIC include)
+if(TARGET ${LIB_DEV_DRIVER}_extend)
+  target_link_libraries(${LIB_DEV_DRIVER} PUBLIC ${LIB_DEV_DRIVER}_extend)
+endif()
 
 include(FetchContent)
 if(FM_BUILD_TEST)

@@ -8,6 +8,12 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+#if defined(__has_include)
+#if __has_include("fm_driver_data_extend.h")
+#include "fm_driver_data_extend.h"
+#define FM_DRIVER_DATA_EXTEND_ENABLED
+#endif
+#endif
 
 // user表示用户侧，dev表示设备侧
 // 消息方向：v:user>dev, ^:dev>user，
