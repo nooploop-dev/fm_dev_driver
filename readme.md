@@ -12,7 +12,8 @@
 ```text
 fm_driver/
 ├── include/                  # 对外公共头
-│   └── fm_driver_for_user.h  #   驱动接口(集成时通常只需这一个)
+│   ├── fm_driver_for_user.h  #   用户端接口(集成时通常只需这一个)
+│   └── fm_driver_data.h      #   消息ID与消息结构体定义(被上面的头包含)
 ├── src/                      # 纯C驱动实现(需一起加入编译)
 │   ├── fm_crc.c/.h           #   CRC 校验
 │   ├── fm_frame.c/.h         #   帧组装/拆解
@@ -47,13 +48,13 @@ fm_driver/
 
 ### 接口概览
 
-所有接口与消息结构体都定义在 [include/fm_driver_for_user.h](include/fm_driver_for_user.h) 中，通信分「设备 → 用户」和「用户 → 设备」两个方向：
+接口定义在 [include/fm_driver_for_user.h](include/fm_driver_for_user.h)，消息 ID 与消息结构体定义在 [include/fm_driver_data.h](include/fm_driver_data.h)（前者已包含后者，业务代码只需 include 前者）。通信分「设备 → 用户」和「用户 → 设备」两个方向：
 
 - **组包**：`fm_prepare_msg_to_dev()` 将一个消息（`FMData*` 结构体）封装为一帧，返回帧长度，随后把该帧通过串口发给设备。
   - 如需在一帧里打包多条消息，使用分步接口：`fm_prepare_msg_to_dev_begin()` → `fm_prepare_msg_to_dev_try_append()`（可多次）→ `fm_prepare_msg_to_dev_end()`。
 - **解析**：用 `FMParserFromDev` + `fm_parser_from_dev_init()` 注册回调，串口每收到一段数据就喂给 `fm_parser_from_dev_handle_data()`，内部自动完成拆帧与解析。每帧开始时回调 `on_frame_begin`（提供角色/uid/帧计数等帧头信息），帧内每解析出一条消息回调一次 `on_frame_msg`（按 `msg_id` 取对应的 `FMData*` 结构体），处理完一帧后回调 `on_frame_end`；不需要的回调可传 `NULL`。
 
-> 消息 ID（`FM_MSG_*`）与结构体（`FMData*`）的一一映射、各字段含义与单位，均见头文件注释。
+> 消息 ID（`FM_MSG_*`）与结构体（`FMData*`）的一一映射、各字段含义与单位，均见 [include/fm_driver_data.h](include/fm_driver_data.h) 的注释。
 >
 > 若你开发的是**设备端固件**（需要组包发给用户），接口见 [include/fm_driver_for_dev.h](include/fm_driver_for_dev.h)。
 

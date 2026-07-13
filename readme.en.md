@@ -12,7 +12,8 @@ This repository contains the driver code for the Nooploop [AOA Follow Me](https:
 ```text
 fm_driver/
 ├── include/                  # Public headers
-│   └── fm_driver_for_user.h  #   Driver API (usually the only one you need)
+│   ├── fm_driver_for_user.h  #   User-side API (usually the only one you need)
+│   └── fm_driver_data.h      #   Message IDs and structs (included by the header above)
 ├── src/                      # Pure C driver implementation (compile these too)
 │   ├── fm_crc.c/.h           #   CRC checksum
 │   ├── fm_frame.c/.h         #   Frame assembly/disassembly
@@ -47,13 +48,13 @@ In your application code you only need `#include "fm_driver_for_user.h"`. The dr
 
 ### API Overview
 
-All APIs and message structs are defined in [include/fm_driver_for_user.h](include/fm_driver_for_user.h). Communication has two directions, "device → user" and "user → device":
+The APIs are declared in [include/fm_driver_for_user.h](include/fm_driver_for_user.h), and the message IDs and structs in [include/fm_driver_data.h](include/fm_driver_data.h) (the former includes the latter, so your code only needs to include the former). Communication has two directions, "device → user" and "user → device":
 
 - **Encoding**: `fm_prepare_msg_to_dev()` packs one message (a `FMData*` struct) into a frame and returns the frame length. You then send the frame to the device over the serial port.
   - To pack multiple messages into a single frame, use the step-by-step API: `fm_prepare_msg_to_dev_begin()` → `fm_prepare_msg_to_dev_try_append()` (callable multiple times) → `fm_prepare_msg_to_dev_end()`.
 - **Parsing**: register callbacks with `FMParserFromDev` + `fm_parser_from_dev_init()`. Feed every chunk of received serial data to `fm_parser_from_dev_handle_data()`; it automatically deframes and parses. `on_frame_begin` is invoked once at the start of each frame (providing the frame header info: role/uid/frame count), `on_frame_msg` once per parsed message inside the frame (cast to the matching `FMData*` struct based on `msg_id`), and `on_frame_end` once after the whole frame is processed; pass `NULL` for callbacks you don't need.
 
-> The mapping between message IDs (`FM_MSG_*`) and their structs (`FMData*`), plus the meaning and unit of each field, is documented in the header comments.
+> The mapping between message IDs (`FM_MSG_*`) and their structs (`FMData*`), plus the meaning and unit of each field, is documented in [include/fm_driver_data.h](include/fm_driver_data.h).
 >
 > If you are developing **device-side firmware** (encoding messages to send to the user), see [include/fm_driver_for_dev.h](include/fm_driver_for_dev.h).
 

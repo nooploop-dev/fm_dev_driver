@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#include "fm_driver_for_user.h"
+#include "fm_driver_data.h"
 
 /**
  * @brief 将一个msg封装为一帧，设备端随后可直接把frame发送给用户

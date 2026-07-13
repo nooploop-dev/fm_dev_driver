@@ -5,10 +5,8 @@
 extern "C" {
 #endif
 
-#include "fm_driver_for_user.h"
-#include "fm_msg.h"
+#include "fm_driver_data.h"
 #include <stddef.h>
-#include <stdint.h>
 #include <string.h>
 
 static inline int16_t fm_clamp_cast_i16(float v) {
