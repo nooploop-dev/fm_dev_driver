@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fm_driver_common.h"
 #include "fm_driver_data.h"
 
 namespace data_handle {

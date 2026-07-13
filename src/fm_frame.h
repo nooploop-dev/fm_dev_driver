@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#include "fm_driver_common.h"
 #include "fm_driver_data.h"
 #include <stddef.h>
 #include <stdint.h>
