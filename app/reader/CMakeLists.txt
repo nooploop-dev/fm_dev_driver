@@ -33,6 +33,10 @@ if(FM_BUILD_FOXGLOVE)
 
   target_sources(${TARGET_NAME} PRIVATE foxglove_viz.cpp)
   target_link_libraries(${TARGET_NAME} PRIVATE foxglove_cpp)
+  if(WIN32)
+    # foxglove sdk windows下依赖ntdll.dll
+    target_link_libraries(${TARGET_NAME} PRIVATE ntdll)
+  endif()
 else()
   # 未启用时链接空实现，reader不引入任何Foxglove代码
   target_sources(${TARGET_NAME} PRIVATE foxglove_viz_stub.cpp)

@@ -3,13 +3,15 @@
 #include <chrono>
 #include <cstddef>
 #include <optional>
-#include <spdlog/spdlog.h>
 
 #include <foxglove/channel.hpp>
 #include <foxglove/error.hpp>
 #include <foxglove/mcap.hpp>
 #include <foxglove/messages.hpp>
 #include <foxglove/websocket.hpp>
+
+// windows下spdlog带入的头文件会导致foxglove编译报错，因此后置
+#include <spdlog/spdlog.h>
 
 namespace {
 
@@ -81,7 +83,8 @@ foxglove::Schema json_schema(const std::string &name, const std::string &text) {
   return schema;
 }
 
-void log_json(std::optional<foxglove::RawChannel> &ch, const std::string &json) {
+void log_json(std::optional<foxglove::RawChannel> &ch,
+              const std::string &json) {
   if (!ch) {
     return;
   }
@@ -112,19 +115,18 @@ void ensure_channels() {
       take(fgm::PoseInFrameChannel::create("/result_pose"), "/result_pose");
   s_scene_ch =
       take(fgm::SceneUpdateChannel::create("/result_scene"), "/result_scene");
-  s_result_ch = take(foxglove::RawChannel::create(
-                         "/result", "json",
-                         json_schema("fm.Result", RESULT_SCHEMA)),
-                     "/result");
+  s_result_ch =
+      take(foxglove::RawChannel::create(
+               "/result", "json", json_schema("fm.Result", RESULT_SCHEMA)),
+           "/result");
   s_spherical_ch =
       take(foxglove::RawChannel::create(
                "/spherical_result", "json",
                json_schema("fm.SphericalResult", SPHERICAL_SCHEMA)),
            "/spherical_result");
-  s_dis_ch = take(
-      foxglove::RawChannel::create("/dis", "json",
-                                   json_schema("fm.Dis", DIS_SCHEMA)),
-      "/dis");
+  s_dis_ch = take(foxglove::RawChannel::create(
+                      "/dis", "json", json_schema("fm.Dis", DIS_SCHEMA)),
+                  "/dis");
 }
 
 } // namespace
@@ -222,32 +224,30 @@ void publish(const FMDataResult &data) {
     s_scene_ch->log(update);
   }
 
-  log_json(s_result_ch,
-           fmt::format(R"({{"local_time":{},"cnt":{},)"
-                       R"("pos_x":{},"pos_y":{},"pos_z":{},)"
-                       R"("vel_x":{},"vel_y":{},"vel_z":{},)"
-                       R"("pos_noise_x":{},"pos_noise_y":{},"pos_noise_z":{},)"
-                       R"("vel_noise_x":{},"vel_noise_y":{},"vel_noise_z":{}}})",
-                       data.local_time, data.cnt, data.pos[0], data.pos[1],
-                       data.pos[2], data.vel[0], data.vel[1], data.vel[2],
-                       data.pos_noise[0], data.pos_noise[1], data.pos_noise[2],
-                       data.vel_noise[0], data.vel_noise[1],
-                       data.vel_noise[2]));
+  log_json(
+      s_result_ch,
+      fmt::format(R"({{"local_time":{},"cnt":{},)"
+                  R"("pos_x":{},"pos_y":{},"pos_z":{},)"
+                  R"("vel_x":{},"vel_y":{},"vel_z":{},)"
+                  R"("pos_noise_x":{},"pos_noise_y":{},"pos_noise_z":{},)"
+                  R"("vel_noise_x":{},"vel_noise_y":{},"vel_noise_z":{}}})",
+                  data.local_time, data.cnt, data.pos[0], data.pos[1],
+                  data.pos[2], data.vel[0], data.vel[1], data.vel[2],
+                  data.pos_noise[0], data.pos_noise[1], data.pos_noise[2],
+                  data.vel_noise[0], data.vel_noise[1], data.vel_noise[2]));
 }
 
 void publish(const FMDataSphericalResult &data) {
-  log_json(s_spherical_ch,
-           fmt::format(R"({{"local_time":{},"cnt":{},"dis":{},)"
-                       R"("azimuth":{},"elevation":{}}})",
-                       data.local_time, data.cnt, data.dis, data.azimuth,
-                       data.elevation));
+  log_json(s_spherical_ch, fmt::format(R"({{"local_time":{},"cnt":{},"dis":{},)"
+                                       R"("azimuth":{},"elevation":{}}})",
+                                       data.local_time, data.cnt, data.dis,
+                                       data.azimuth, data.elevation));
 }
 
 void publish(const FMDataDis &data) {
   log_json(s_dis_ch,
-           fmt::format(
-               R"({{"local_time":{},"cnt":{},"dis":{},"rx_rate":{}}})",
-               data.local_time, data.cnt, data.dis, data.rx_rate));
+           fmt::format(R"({{"local_time":{},"cnt":{},"dis":{},"rx_rate":{}}})",
+                       data.local_time, data.cnt, data.dis, data.rx_rate));
 }
 
 void shutdown() {
