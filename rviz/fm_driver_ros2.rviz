@@ -67,7 +67,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /ros_converter/result_pose
+        Value: /fm_driver/result_pose
       Value: true
   Enabled: true
   Global Options:

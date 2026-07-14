@@ -4,7 +4,7 @@
 #include <thread>
 
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "ros_converter");
+  ros::init(argc, argv, "fm_driver");
   ros::NodeHandle nh("~");
 
   std::string log_dir;

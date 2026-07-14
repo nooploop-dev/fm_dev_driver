@@ -3,7 +3,7 @@
     <arg name="baudrate" default="921600" />
     <arg name="frame_id" default="fm_anchor_link" />
 
-    <node pkg="fm_driver" type="ros_converter" name="ros_converter" output="screen">
+    <node pkg="fm_driver" type="fm_driver" name="fm_driver" output="screen">
         <param name="port" value="$(arg port)" />
         <param name="baudrate" value="$(arg baudrate)" />
         <param name="frame_id" value="$(arg frame_id)" />

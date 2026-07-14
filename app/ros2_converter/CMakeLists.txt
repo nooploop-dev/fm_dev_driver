@@ -1,6 +1,7 @@
-set(TARGET_NAME ros_converter)
+set(TARGET_NAME fm_driver_node)
 add_executable(${TARGET_NAME} main.cpp ros2_data_handle.cpp
                               ros2_data_handle.hpp)
+set_target_properties(${TARGET_NAME} PROPERTIES OUTPUT_NAME fm_driver)
 target_link_libraries(${TARGET_NAME} ${LIB_COMMON})
 ament_target_dependencies(${TARGET_NAME} rclcpp std_msgs geometry_msgs)
 rosidl_get_typesupport_target(cpp_typesupport_target ${PKG_NAME}

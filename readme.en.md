@@ -116,7 +116,7 @@ void app_send_find(void) {
 
 ## ROS Integration
 
-ROS1 and ROS2 share the same code. The node name and executable name are both `ros_converter`. The build picks the ROS version automatically from the `ROS_VERSION` environment variable, so no manual configuration is needed.
+ROS1 and ROS2 share the same code. The node name and executable name are both `fm_driver`. The build picks the ROS version automatically from the `ROS_VERSION` environment variable, so no manual configuration is needed.
 
 > Prerequisite: ROS installed and `source /opt/ros/<distro>/setup.bash` done.
 
@@ -147,7 +147,7 @@ Arguments (common to both):
 On ROS2 you can also run the node directly without launch:
 
 ```bash
-ros2 run fm_driver ros_converter --ros-args -p port:=/dev/ttyACM0
+ros2 run fm_driver fm_driver --ros-args -p port:=/dev/ttyACM0
 ```
 
 > If you get a serial "Permission denied" error at startup, see [Serial Port Permissions (Linux)](#serial-port-permissions-linux) below.
@@ -173,13 +173,13 @@ In addition to the arguments above:
 ### View Data
 
 ```bash
-rostopic echo /ros_converter/result       # ROS1
-ros2 topic echo /ros_converter/result     # ROS2
+rostopic echo /fm_driver/result       # ROS1
+ros2 topic echo /fm_driver/result     # ROS2
 ```
 
 ### Topics
 
-All topics are namespaced under the node name, i.e. `/ros_converter/<topic>`. Message field definitions are in the [msg/](msg/) directory.
+All topics are namespaced under the node name, i.e. `/fm_driver/<topic>`. Message field definitions are in the [msg/](msg/) directory.
 
 **Device → User** (subscribe to receive data)
 
@@ -283,7 +283,7 @@ Reference: [Fix Serial Port “Permission Denied” Errors on Linux](https://web
 
 If neither ROS option is set explicitly, the build picks one based on the `ROS_VERSION` environment variable, so `catkin_make` / `colcon build` in a ROS workspace just works.
 
-Once ROS1 or ROS2 is enabled, the last four options all default to OFF: a ROS build only produces the `ros_converter` node, and it neither builds the host-side examples and unit tests nor fetches Catch2 / the Foxglove SDK. Turn any of them back on explicitly if you need it, e.g. to build and run the unit tests inside a ROS workspace:
+Once ROS1 or ROS2 is enabled, the last four options all default to OFF: a ROS build only produces the `fm_driver` node, and it neither builds the host-side examples and unit tests nor fetches Catch2 / the Foxglove SDK. Turn any of them back on explicitly if you need it, e.g. to build and run the unit tests inside a ROS workspace:
 
 ```bash
 catkin_make -DFM_BUILD_TEST=ON                              # ROS1

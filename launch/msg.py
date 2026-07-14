@@ -12,8 +12,8 @@ def generate_launch_description():
             DeclareLaunchArgument("frame_id", default_value="fm_anchor_link"),
             Node(
                 package="fm_driver",
-                executable="ros_converter",
-                name="ros_converter",
+                executable="fm_driver",
+                name="fm_driver",
                 output="screen",
                 parameters=[
                     {
