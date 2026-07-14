@@ -274,11 +274,18 @@ Reference: [Fix Serial Port “Permission Denied” Errors on Linux](https://web
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `FM_BUILD_READER` | ON | Build the serial receive/parse example |
-| `FM_BUILD_WRITER` | ON | Build the encode/serial send example |
-| `FM_BUILD_FOXGLOVE` | ON for non-ROS / OFF for ROS builds | Enable Foxglove visualization in the reader (fetches the prebuilt SDK); can be overridden explicitly |
-| `FM_BUILD_TEST` | ON | Build the pure C driver unit tests (fetches Catch2 automatically) |
-| `FM_BUILD_ROS1` | OFF | Build the ROS1 driver package |
-| `FM_BUILD_ROS2` | OFF | Build the ROS2 driver package |
+| `FM_BUILD_ROS1` | auto-detected from `ROS_VERSION` | Build the ROS1 driver package |
+| `FM_BUILD_ROS2` | auto-detected from `ROS_VERSION` | Build the ROS2 driver package |
+| `FM_BUILD_READER` | ON for non-ROS / OFF for ROS builds | Build the serial receive/parse example |
+| `FM_BUILD_WRITER` | ON for non-ROS / OFF for ROS builds | Build the encode/serial send example |
+| `FM_BUILD_FOXGLOVE` | ON for non-ROS / OFF for ROS builds | Enable Foxglove visualization in the reader (fetches the prebuilt SDK) |
+| `FM_BUILD_TEST` | ON for non-ROS / OFF for ROS builds | Build the pure C driver unit tests (fetches Catch2 automatically) |
 
 If neither ROS option is set explicitly, the build picks one based on the `ROS_VERSION` environment variable, so `catkin_make` / `colcon build` in a ROS workspace just works.
+
+Once ROS1 or ROS2 is enabled, the last four options all default to OFF: a ROS build only produces the `ros_converter` node, and it neither builds the host-side examples and unit tests nor fetches Catch2 / the Foxglove SDK. Turn any of them back on explicitly if you need it, e.g. to build and run the unit tests inside a ROS workspace:
+
+```bash
+catkin_make -DFM_BUILD_TEST=ON                              # ROS1
+colcon build --cmake-args -DFM_BUILD_TEST=ON                # ROS2
+```

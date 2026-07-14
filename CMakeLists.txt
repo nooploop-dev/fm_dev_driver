@@ -4,10 +4,6 @@ set(PKG_NAME fm_driver)
 
 project(${PKG_NAME})
 
-option(FM_BUILD_READER "build reader" ON)
-option(FM_BUILD_WRITER "build writer" ON)
-option(FM_BUILD_TEST "build test" ON)
-
 # 未显式选择ROS版本时，尝试根据环境变量自动检测
 set(_fm_ros1_default OFF)
 set(_fm_ros2_default OFF)
@@ -21,14 +17,17 @@ endif()
 option(FM_BUILD_ROS1 "build ROS1 converter" ${_fm_ros1_default})
 option(FM_BUILD_ROS2 "build ROS2 converter" ${_fm_ros2_default})
 
-# 非ROS构建时默认启用FOXGLOVE可视化支持
+# 非ROS构建时默认启用reader/writer/test以及FOXGLOVE可视化支持， ROS构建时这些默认关闭
 if(FM_BUILD_ROS1 OR FM_BUILD_ROS2)
-  set(FM_FOXGLOVE_DEFAULT OFF)
+  set(_fm_native_default OFF)
 else()
-  set(FM_FOXGLOVE_DEFAULT ON)
+  set(_fm_native_default ON)
 endif()
+option(FM_BUILD_READER "build reader" ${_fm_native_default})
+option(FM_BUILD_WRITER "build writer" ${_fm_native_default})
+option(FM_BUILD_TEST "build test" ${_fm_native_default})
 option(FM_BUILD_FOXGLOVE "build reader with foxglove visualization"
-       ${FM_FOXGLOVE_DEFAULT})
+       ${_fm_native_default})
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
