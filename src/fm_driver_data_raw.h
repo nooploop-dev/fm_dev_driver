@@ -144,8 +144,7 @@ typedef struct {
 static inline void
 fm_data_heartbeat_from_raw(const FMRawDataHeartbeat *raw_data,
                            FMDataHeartbeat *data) {
-  size_t len =
-      strnlen(raw_data->hardware.name, sizeof(raw_data->hardware.name));
+  size_t len = strlen(raw_data->hardware.name);
   memcpy(data->hardware.name, raw_data->hardware.name, len);
   data->hardware.name[len] = '\0';
   data->hardware.version[0] = raw_data->hardware.version[0];
@@ -168,7 +167,7 @@ static inline void fm_data_heartbeat_to_raw(const FMDataHeartbeat *data,
                                             int *raw_data_size) {
   FMRawDataHeartbeat *raw = (FMRawDataHeartbeat *)raw_data;
   memset(raw, 0, sizeof(*raw));
-  size_t size = strnlen(data->hardware.name, sizeof(raw->hardware.name) - 1);
+  size_t size = strlen(data->hardware.name);
   memcpy(raw->hardware.name, data->hardware.name, size);
   raw->hardware.name[size] = '\0';
   raw->hardware.version[0] = data->hardware.version[0];
