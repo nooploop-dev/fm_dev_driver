@@ -1,11 +1,12 @@
 #include "catch2/catch_all.hpp"
-#include "fm_dev_driver.h"
+#include "fm_driver_for_dev.h"
+#include "fm_driver_for_user.h"
 // 白盒测试: 需要构造 payload 大小与"当前版本结构体"不一致的帧，
 // 这只能在内部 wire 层手工拼装(对外接口总是产生正确大小)，故依赖内部头。
-#include "fm_dev_crc.h"
-#include "fm_dev_driver_raw.h"
-#include "fm_dev_frame.h"
-#include "fm_dev_msg.h"
+#include "fm_crc.h"
+#include "fm_driver_data_raw.h"
+#include "fm_frame.h"
+#include "fm_msg.h"
 #include <cstring>
 #include <vector>
 
@@ -17,9 +18,9 @@ struct Captured {
 };
 std::vector<Captured> g_msgs;
 
-void on_from_user(fm_frame_cnt_t cnt, fm_msg_id_t id, const void *payload,
-                  int size) {
-  (void)cnt;
+void on_from_user_msg(fm_connect_type_e connect_type, fm_msg_id_t id,
+                      const void *payload, int size) {
+  (void)connect_type;
   Captured c{};
   c.id = id;
   const uint8_t *p = static_cast<const uint8_t *>(payload);
@@ -50,7 +51,7 @@ std::vector<uint8_t> craft_frame(fm_frame_cnt_t cnt, fm_msg_id_t id,
 TEST_CASE("msg payload version compatibility") {
   g_msgs.clear();
   FMParserFromUser parser;
-  fm_parser_from_user_init(&parser, on_from_user);
+  fm_parser_from_user_init(&parser, nullptr, on_from_user_msg, nullptr);
 
   // 取一个含定长整数末尾字段的协议结构体，便于观察末尾字段
   FMRawDataParam raw{};

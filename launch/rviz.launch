@@ -1,0 +1,24 @@
+<launch>
+    <arg name="port" default="/dev/ttyUSB0" />
+    <arg name="baudrate" default="921600" />
+    <arg name="frame_id" default="fm_anchor_link" />
+
+    <!-- 基站坐标系的父坐标系。发布一个静态TF，否则rviz里fm_anchor_link不存在 -->
+    <arg name="parent_frame" default="map" />
+    <!-- 基站在parent_frame中的安装位姿: x y z yaw pitch roll -->
+    <arg name="anchor_pose" default="0 0 0 0 0 0" />
+    <!-- 若已由其它节点发布该TF，置false避免冲突 -->
+    <arg name="static_tf" default="true" />
+
+    <include file="$(find fm_driver)/launch/msg.launch">
+        <arg name="port" value="$(arg port)" />
+        <arg name="baudrate" value="$(arg baudrate)" />
+        <arg name="frame_id" value="$(arg frame_id)" />
+    </include>
+
+    <node if="$(arg static_tf)" pkg="tf2_ros" type="static_transform_publisher"
+          name="fm_anchor_tf" args="$(arg anchor_pose) $(arg parent_frame) $(arg frame_id)" />
+
+    <node pkg="rviz" type="rviz" name="rviz" required="true"
+          args="-d $(find fm_driver)/rviz/fm_driver_ros1.rviz" />
+</launch>

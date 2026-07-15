@@ -1,12 +1,36 @@
 cmake_minimum_required(VERSION 3.22)
 
-set(PKG_NAME fm_dev_driver)
+set(PKG_NAME fm_driver)
 
 project(${PKG_NAME})
 
-option(FM_BUILD_ROS1 "build ROS1 converter" OFF)
-option(FM_BUILD_ROS2 "build ROS2 converter" OFF)
-option(FM_BUILD_TEST "build test" OFF)
+# 未显式选择ROS版本时，尝试根据环境变量自动检测
+set(_fm_ros1_default OFF)
+set(_fm_ros2_default OFF)
+if(NOT DEFINED FM_BUILD_ROS1 AND NOT DEFINED FM_BUILD_ROS2)
+    if("$ENV{ROS_VERSION}" STREQUAL "1")
+        set(_fm_ros1_default ON)
+    elseif("$ENV{ROS_VERSION}" STREQUAL "2")
+        set(_fm_ros2_default ON)
+    endif()
+endif()
+option(FM_BUILD_ROS1 "build ROS1 converter" ${_fm_ros1_default})
+option(FM_BUILD_ROS2 "build ROS2 converter" ${_fm_ros2_default})
+
+# 非ROS构建时默认启用reader/writer/test以及FOXGLOVE可视化支持， ROS构建时这些默认关闭
+if(FM_BUILD_ROS1 OR FM_BUILD_ROS2)
+    set(_fm_native_default OFF)
+else()
+    set(_fm_native_default ON)
+endif()
+option(FM_BUILD_READER "build reader" ${_fm_native_default})
+option(FM_BUILD_WRITER "build writer" ${_fm_native_default})
+option(FM_BUILD_TEST "build test" ${_fm_native_default})
+option(
+    FM_BUILD_FOXGLOVE
+    "build reader with foxglove visualization"
+    ${_fm_native_default}
+)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -14,119 +38,109 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-add_compile_definitions("$<$<CONFIG:Debug>:DEBUG>")
 foreach(lang C CXX)
-  foreach(config RELEASE MINSIZEREL RELWITHDEBINFO)
-    string(REGEX REPLACE "[-/]D[ ]?NDEBUG" "" CMAKE_${lang}_FLAGS_${config}
-                         "${CMAKE_${lang}_FLAGS_${config}}")
-  endforeach()
+    foreach(config RELEASE MINSIZEREL RELWITHDEBINFO)
+        string(
+            REGEX REPLACE "[-/]D[ ]?NDEBUG"
+            ""
+            CMAKE_${lang}_FLAGS_${config}
+            "${CMAKE_${lang}_FLAGS_${config}}"
+        )
+    endforeach()
 endforeach()
 if(MSVC)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /utf-8")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
-  add_compile_options(/W4)
-  add_compile_options(/permissive-)
-  add_compile_definitions(NOMINMAX)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /utf-8")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
+    add_compile_options(/W4)
+    # foxglove sdk 需要禁用MSVC的permissive-模式，否则编译报错
+    # add_compile_options(/permissive-)
+    add_compile_definitions(NOMINMAX)
+    add_compile_definitions(_WIN32_WINNT=0x0A00)
 else()
-  add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 set(LIB_DEV_DRIVER lib_${PKG_NAME})
 add_library(
-  ${LIB_DEV_DRIVER} STATIC
-  # 对外公共头
-  include/fm_dev_driver.h
-  # 内部实现
-  src/fm_dev_crc.c
-  src/fm_dev_crc.h
-  src/fm_dev_msg.h
-  src/fm_dev_frame.c
-  src/fm_dev_frame.h
-  src/fm_dev_driver_raw.h
-  src/fm_dev_driver.c)
-target_include_directories(
-  ${LIB_DEV_DRIVER}
-  PUBLIC include
-  PRIVATE src)
+    ${LIB_DEV_DRIVER}
+    STATIC
+    src/fm_crc.c
+    src/fm_frame.c
+    src/fm_driver.c
+)
+target_include_directories(${LIB_DEV_DRIVER} PUBLIC include)
+if(TARGET ${LIB_DEV_DRIVER}_extend)
+    target_link_libraries(${LIB_DEV_DRIVER} PUBLIC ${LIB_DEV_DRIVER}_extend)
+endif()
 
 include(FetchContent)
 if(FM_BUILD_TEST)
-  FetchContent_Declare(
-    Catch2
-    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG v3.7.1)
-  FetchContent_MakeAvailable(Catch2)
-  enable_testing()
-  add_subdirectory(test)
-endif()
-
-# 三者都未显式启用时，回退到根据环境变量自动检测
-if(NOT FM_BUILD_ROS1 AND NOT FM_BUILD_ROS2)
-  if(DEFINED ENV{ROS_VERSION})
-    if("$ENV{ROS_VERSION}" STREQUAL "1")
-      set(FM_BUILD_ROS1 ON)
-    elseif("$ENV{ROS_VERSION}" STREQUAL "2")
-      set(FM_BUILD_ROS2 ON)
-    endif()
-  endif()
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.7.1
+    )
+    FetchContent_MakeAvailable(Catch2)
+    enable_testing()
+    add_subdirectory(test)
 endif()
 
 if(FM_BUILD_ROS1)
-  message(STATUS "build ROS1 Converter")
-endif()
-if(FM_BUILD_ROS2)
-  message(STATUS "build ROS2 Converter")
-endif()
-
-if(FM_BUILD_ROS1)
-  find_package(catkin REQUIRED COMPONENTS roscpp std_msgs message_generation)
-  add_message_files(
-    FILES
-    Result.msg
-    SphericalResult.msg
-    DataUserToUser.msg
-    Echo.msg
-    Find.msg
-    Restart.msg
-    Param.msg
-    Heartbeat.msg
-    PrevResult.msg
-    BeginPair.msg
-    CancelPair.msg
-    PrevSphericalResult.msg
-    Dis.msg)
-  generate_messages(DEPENDENCIES std_msgs)
-  catkin_package(CATKIN_DEPENDS roscpp std_msgs message_runtime)
+    find_package(
+        catkin
+        REQUIRED
+        COMPONENTS roscpp std_msgs geometry_msgs message_generation
+    )
+    add_message_files(
+            FILES
+            Result.msg
+            SphericalResult.msg
+            DataUserToUser.msg
+            Echo.msg
+            Find.msg
+            Restart.msg
+            Param.msg
+            Heartbeat.msg
+            PrevResult.msg
+            BeginPair.msg
+            CancelPair.msg
+            PrevSphericalResult.msg
+            Dis.msg
+    )
+    generate_messages(DEPENDENCIES std_msgs)
+    catkin_package(CATKIN_DEPENDS roscpp std_msgs geometry_msgs message_runtime)
 endif()
 
 if(FM_BUILD_ROS2)
-  find_package(ament_cmake REQUIRED)
-  find_package(rclcpp REQUIRED)
-  find_package(std_msgs REQUIRED)
-  find_package(rosidl_default_generators REQUIRED)
-  rosidl_generate_interfaces(
-    ${PKG_NAME}
-    "msg/Result.msg"
-    "msg/SphericalResult.msg"
-    "msg/DataUserToUser.msg"
-    "msg/Echo.msg"
-    "msg/Find.msg"
-    "msg/Restart.msg"
-    "msg/Param.msg"
-    "msg/Heartbeat.msg"
-    "msg/PrevResult.msg"
-    "msg/BeginPair.msg"
-    "msg/CancelPair.msg"
-    "msg/PrevSphericalResult.msg"
-    "msg/Dis.msg"
-    DEPENDENCIES
-    std_msgs)
-  ament_export_dependencies(rosidl_default_runtime)
-  install(DIRECTORY launch DESTINATION share/${PKG_NAME})
+    find_package(ament_cmake REQUIRED)
+    find_package(rclcpp REQUIRED)
+    find_package(std_msgs REQUIRED)
+    find_package(geometry_msgs REQUIRED)
+    find_package(rosidl_default_generators REQUIRED)
+    rosidl_generate_interfaces(
+            ${PKG_NAME}
+            "msg/Result.msg"
+            "msg/SphericalResult.msg"
+            "msg/DataUserToUser.msg"
+            "msg/Echo.msg"
+            "msg/Find.msg"
+            "msg/Restart.msg"
+            "msg/Param.msg"
+            "msg/Heartbeat.msg"
+            "msg/PrevResult.msg"
+            "msg/BeginPair.msg"
+            "msg/CancelPair.msg"
+            "msg/PrevSphericalResult.msg"
+            "msg/Dis.msg"
+            DEPENDENCIES
+            std_msgs
+    )
+    ament_export_dependencies(rosidl_default_runtime)
+    install(DIRECTORY launch rviz DESTINATION share/${PKG_NAME})
 endif()
 
 add_subdirectory(app)
 
 if(FM_BUILD_ROS2)
-  ament_package()
+    ament_package()
 endif()

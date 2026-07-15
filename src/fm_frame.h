@@ -5,7 +5,8 @@
 extern "C" {
 #endif
 
-#include "fm_dev_driver.h"
+#include "fm_driver_common.h"
+#include "fm_driver_data.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -19,9 +20,7 @@ typedef uint8_t fm_frame_sof_t;
 
 #define FM_ROLE_BITS 4
 
-// 帧长度
 typedef uint16_t fm_frame_payload_size_t;
-// 帧校验
 typedef uint16_t fm_frame_checksum_t;
 
 // 需要嵌入到user_data通过uwb发送的消息的最大负载长度
@@ -86,16 +85,15 @@ typedef void (*fm_frame_cb_f)(void *arg, const void *frame, int frame_size);
  * @brief 通用帧解析: 将data写入缓冲区并尽可能多地提取完整帧
  *
  * 按SOF对齐并校验CRC，每解析出一帧调用cb; 已消费的数据会从缓冲区前移清除。
- * 缓冲区由调用方持有(容量FM_FRAME_SIZE_MAX)，index_begin/index_end为读写游标。
  *
- * @param buffer 帧缓冲区(容量FM_FRAME_SIZE_MAX)
- * @param index_begin 有效数据起始游标(原地更新)
- * @param index_end 有效数据结束游标(原地更新)
- * @param layout 帧布局描述
- * @param data 新接收到的数据
- * @param data_size 数据大小
+ * @param buffer 帧缓冲区，由调用方持有(容量FM_FRAME_SIZE_MAX)
+ * @param index_begin 有效数据起始游标，原地更新
+ * @param index_end 有效数据结束游标，原地更新
+ * @param layout 帧布局描述(两个方向的帧头不同)
+ * @param data 新收到的数据
+ * @param data_size data的字节数
  * @param cb 每提取到一帧时的回调
- * @param arg 透传给cb的用户参数
+ * @param arg 原样透传给cb
  */
 void fm_frame_buffer_feed(uint8_t *buffer, int *index_begin, int *index_end,
                           const FMFrameLayout *layout, const void *data,

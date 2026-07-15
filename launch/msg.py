@@ -9,15 +9,17 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("port", default_value="/dev/ttyACM0"),
             DeclareLaunchArgument("baudrate", default_value="921600"),
+            DeclareLaunchArgument("frame_id", default_value="fm_anchor_link"),
             Node(
-                package="fm_dev_driver",
-                executable="ros_converter",
-                name="ros_converter",
+                package="fm_driver",
+                executable="fm_driver",
+                name="fm_driver",
                 output="screen",
                 parameters=[
                     {
                         "port": LaunchConfiguration("port"),
                         "baudrate": LaunchConfiguration("baudrate"),
+                        "frame_id": LaunchConfiguration("frame_id"),
                     }
                 ],
             ),

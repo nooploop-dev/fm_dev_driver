@@ -5,9 +5,8 @@
 extern "C" {
 #endif
 
-#include "fm_dev_driver.h"
+#include "fm_driver_data.h"
 #include <stddef.h>
-#include <stdint.h>
 #include <string.h>
 
 static inline int16_t fm_clamp_cast_i16(float v) {
@@ -24,6 +23,11 @@ static inline uint16_t fm_clamp_cast_u16(float v) {
     v = 0.0f;
   return (uint16_t)v;
 }
+
+// 计算payload形式的数据的字节数
+#define FM_PAYLOAD_VALID_SIZE(data)                                            \
+  (int)((const uint8_t *)&(data).payload - (const uint8_t *)&(data) +          \
+        (data).payload_size)
 
 #pragma pack(push, 1)
 
@@ -42,7 +46,7 @@ static inline void fm_data_echo_to_raw(const FMDataEcho *data, void *raw_data,
   memset(raw, 0, sizeof(*raw));
   raw->payload_size = data->payload_size;
   memcpy(raw->payload, data->payload, data->payload_size);
-  *raw_data_size = offsetof(FMRawDataEcho, payload) + raw->payload_size;
+  *raw_data_size = FM_PAYLOAD_VALID_SIZE(*raw);
 }
 
 typedef struct {
@@ -140,8 +144,7 @@ typedef struct {
 static inline void
 fm_data_heartbeat_from_raw(const FMRawDataHeartbeat *raw_data,
                            FMDataHeartbeat *data) {
-  size_t len =
-      strnlen(raw_data->hardware.name, sizeof(raw_data->hardware.name));
+  size_t len = strlen(raw_data->hardware.name);
   memcpy(data->hardware.name, raw_data->hardware.name, len);
   data->hardware.name[len] = '\0';
   data->hardware.version[0] = raw_data->hardware.version[0];
@@ -164,7 +167,7 @@ static inline void fm_data_heartbeat_to_raw(const FMDataHeartbeat *data,
                                             int *raw_data_size) {
   FMRawDataHeartbeat *raw = (FMRawDataHeartbeat *)raw_data;
   memset(raw, 0, sizeof(*raw));
-  size_t size = strnlen(data->hardware.name, sizeof(raw->hardware.name) - 1);
+  size_t size = strlen(data->hardware.name);
   memcpy(raw->hardware.name, data->hardware.name, size);
   raw->hardware.name[size] = '\0';
   raw->hardware.version[0] = data->hardware.version[0];
@@ -361,9 +364,7 @@ typedef struct {
 typedef FMRawDataUserData FMRawDataDataUserToDev;
 typedef FMRawDataUserData FMRawDataDataDevToUser;
 typedef FMRawDataUserData FMRawDataDataUserToUser;
-static inline int fm_msg_user_data_bytes(const FMRawDataUserData *u) {
-  return (int)(offsetof(FMRawDataUserData, payload) + u->payload_size);
-}
+
 static inline void
 fm_data_user_to_user_from_raw(const FMRawDataDataUserToUser *raw_data,
                               FMDataDataUserToUser *data) {
@@ -377,7 +378,7 @@ static inline void fm_data_user_to_user_to_raw(const FMDataDataUserToUser *data,
   memset(raw, 0, sizeof(*raw));
   raw->payload_size = data->payload_size;
   memcpy(raw->payload, data->payload, data->payload_size);
-  *raw_data_size = fm_msg_user_data_bytes(raw);
+  *raw_data_size = FM_PAYLOAD_VALID_SIZE(*raw);
 }
 
 #pragma pack(pop)
